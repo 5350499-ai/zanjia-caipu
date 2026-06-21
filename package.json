@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "build": "node scripts/build-static.cjs",
     "dev": "node server.cjs"
   },
   "dependencies": {},
