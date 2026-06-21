@@ -1,6 +1,8 @@
+const { isAuthorized, sendJson } = require('../lib/server-auth')
+
 module.exports = function handler(request, response) {
-  response.setHeader('Cache-Control', 'no-store')
-  response.status(200).json({
+  if (!isAuthorized(request)) return sendJson(response, 401, { error: 'Unauthorized' })
+  return sendJson(response, 200, {
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
   })

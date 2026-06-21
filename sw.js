@@ -1,4 +1,4 @@
-const CACHE_NAME = 'family-recipes-shell-v3'
+const CACHE_NAME = 'family-recipes-shell-v4'
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/src/styles.css', '/src/main.js', '/src/cloud.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png']
 
 self.addEventListener('install', event => {
@@ -15,7 +15,8 @@ self.addEventListener('activate', event => {
 })
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return
+  const url = new URL(event.request.url)
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
   event.respondWith(
     fetch(event.request)
       .then(response => {

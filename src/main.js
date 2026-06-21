@@ -39,6 +39,8 @@ let searchIsComposing = false
 let noteEditor = null
 let imagePreview = false
 const root = document.getElementById('root')
+let appStarted = false
+let authBusy = false
 
 const icons = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -71,7 +73,19 @@ function getFilteredRecipes() {
       ...(recipe.notes || []).map(note => note.text || ''),
     ].join(' ').toLowerCase()
     return categoryMatch && (!keyword || searchableText.includes(keyword))
+  }).sort((a, b) => {
+    const recent = String(b.lastViewedAt || '').localeCompare(String(a.lastViewedAt || ''))
+    if (recent) return recent
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
   })
+}
+
+function authTemplate(message = '') {
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="app-password">访问密码</label><input id="app-password" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="请输入密码" required><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
+}
+
+function authLoadingTemplate() {
+  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p>正在打开咱家菜谱…</p></section></main>`
 }
 
 function recipePanelTemplate() {
@@ -460,13 +474,125 @@ function deleteNote(noteId) {
   render()
 }
 
+function openRecipe(recipeId) {
+  const viewedAt = new Date().toISOString()
+  recipes = recipes.map(recipe => recipe.id === recipeId ? { ...recipe, lastViewedAt: viewedAt } : recipe)
+  persistRecipes()
+  selectedId = recipeId
+  page = 'detail'
+  history.pushState({ appPage: 'detail', recipeId }, '')
+  render()
+}
+
+function goHome(fromHistory = false) {
+  if (!fromHistory && history.state?.appPage === 'detail') {
+    history.back()
+    return
+  }
+  selectedId = null
+  imageMenu = false
+  imagePreview = false
+  noteEditor = null
+  page = 'home'
+  render()
+}
+
+function setupEdgeSwipeBack() {
+  const shell = document.querySelector('.detail-shell')
+  if (!shell || imageMenu || imagePreview) return
+  let tracking = false
+  let horizontal = false
+  let startX = 0
+  let startY = 0
+  let currentX = 0
+  let startedAt = 0
+
+  shell.addEventListener('touchstart', event => {
+    if (event.touches.length !== 1 || event.touches[0].clientX > 28) return
+    const touch = event.touches[0]
+    tracking = true
+    horizontal = false
+    startX = currentX = touch.clientX
+    startY = touch.clientY
+    startedAt = performance.now()
+    shell.classList.add('edge-swipe-active')
+  }, { passive: true })
+
+  shell.addEventListener('touchmove', event => {
+    if (!tracking || event.touches.length !== 1) return
+    const touch = event.touches[0]
+    const dx = Math.max(0, touch.clientX - startX)
+    const dy = touch.clientY - startY
+    if (!horizontal && Math.abs(dy) > 12 && Math.abs(dy) > dx) {
+      tracking = false
+      shell.classList.remove('edge-swipe-active')
+      return
+    }
+    if (dx > 8 && dx > Math.abs(dy) * 1.15) horizontal = true
+    if (!horizontal) return
+    event.preventDefault()
+    currentX = touch.clientX
+    shell.style.transform = `translate3d(${Math.min(dx, innerWidth)}px,0,0)`
+  }, { passive: false })
+
+  const finish = () => {
+    if (!tracking) return
+    const distance = Math.max(0, currentX - startX)
+    const velocity = distance / Math.max(1, performance.now() - startedAt)
+    const shouldReturn = horizontal && (distance > Math.min(96, innerWidth * .25) || (distance > 45 && velocity > .45))
+    tracking = false
+    shell.classList.remove('edge-swipe-active')
+    shell.style.transition = 'transform 180ms cubic-bezier(.22,.75,.25,1)'
+    shell.style.transform = shouldReturn ? `translate3d(${innerWidth}px,0,0)` : 'translate3d(0,0,0)'
+    if (shouldReturn) setTimeout(goHome, 175)
+    else setTimeout(() => { shell.style.transition = ''; shell.style.transform = '' }, 190)
+  }
+  shell.addEventListener('touchend', finish, { passive: true })
+  shell.addEventListener('touchcancel', finish, { passive: true })
+}
+
 function render(preserveFocus = false) {
   if (page === 'new' || page === 'edit') root.innerHTML = newRecipeTemplate()
   else if (page === 'detail') root.innerHTML = detailTemplate(recipes.find(recipe => recipe.id === selectedId))
   else root.innerHTML = homeTemplate()
   if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
   if (imagePreview) setupImagePreviewInteractions()
+  if (page === 'detail') setupEdgeSwipeBack()
   if (page === 'home') requestAnimationFrame(centerActiveCategory)
+}
+
+async function startApplication() {
+  if (appStarted) return
+  appStarted = true
+  history.replaceState({ appPage: 'home' }, '')
+  render()
+  await hydrateRecipeImages()
+  await bootstrapCloudSync()
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败。', error))
+}
+
+window.addEventListener('popstate', event => {
+  if (!appStarted) return
+  const recipeId = Number(event.state?.recipeId)
+  if (event.state?.appPage === 'detail' && recipes.some(recipe => recipe.id === recipeId)) {
+    selectedId = recipeId
+    page = 'detail'
+    render()
+    return
+  }
+  goHome(true)
+})
+
+async function checkAccess() {
+  root.innerHTML = authLoadingTemplate()
+  try {
+    const response = await fetch('/api/auth', { cache: 'no-store', credentials: 'same-origin' })
+    const result = await response.json()
+    if (response.ok && result.authenticated) return startApplication()
+    root.innerHTML = authTemplate(response.status === 503 ? result.error : '')
+  } catch {
+    root.innerHTML = authTemplate('暂时无法验证访问，请检查网络后重试')
+  }
 }
 
 root.addEventListener('input', event => {
@@ -477,6 +603,31 @@ root.addEventListener('input', event => {
   if (event.target.dataset.draft && draft) {
     draft[event.target.dataset.draft] = event.target.value
     draftDirty = true
+  }
+})
+
+root.addEventListener('submit', async event => {
+  if (event.target.id !== 'auth-form') return
+  event.preventDefault()
+  if (authBusy) return
+  const password = new FormData(event.target).get('password')
+  authBusy = true
+  root.innerHTML = authTemplate()
+  try {
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    const result = await response.json()
+    authBusy = false
+    if (response.ok) return startApplication()
+    root.innerHTML = authTemplate(result.error || '密码不正确')
+    document.getElementById('app-password')?.focus()
+  } catch {
+    authBusy = false
+    root.innerHTML = authTemplate('网络连接失败，请稍后重试')
   }
 })
 
@@ -527,7 +678,7 @@ root.addEventListener('click', event => {
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; render(); return }
-  if (target.dataset.recipe) { selectedId = Number(target.dataset.recipe); page = 'detail'; render(); return }
+  if (target.dataset.recipe) { openRecipe(Number(target.dataset.recipe)); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
   if (target.dataset.editNote) { openNoteEditor(target.dataset.editNote); return }
   if (target.dataset.deleteNote) { deleteNote(target.dataset.deleteNote); return }
@@ -557,9 +708,9 @@ root.addEventListener('click', event => {
     return
   }
   if (action === 'clear') { query = ''; const search = document.getElementById('search'); if (search) { search.value = ''; search.focus() } updateSearchResults(); return }
-  if (action === 'back-home') { selectedId = null; imageMenu = false; imagePreview = false; noteEditor = null; page = 'home'; render(); return }
+  if (action === 'back-home') { goHome(); return }
   if (action === 'add-image' && page === 'detail') { document.getElementById('file-input')?.click(); return }
-  if (action === 'add-image') { selectedId = Number(target.closest('[data-recipe]')?.dataset.recipe); page = 'detail'; render(); return }
+  if (action === 'add-image') { openRecipe(Number(target.closest('[data-recipe]')?.dataset.recipe)); return }
   if (action === 'image-menu' && page === 'detail') { event.stopPropagation(); imageMenu = true; render(); return }
   if (action === 'close-menu' && (target === event.target || target.classList.contains('cancel'))) { imageMenu = false; render(); return }
   if (action === 'replace-image') { imageMenu = false; render(); setTimeout(() => document.getElementById('file-input')?.click()); return }
@@ -578,12 +729,4 @@ root.addEventListener('click', event => {
   if (action === 'close-preview') { imagePreview = false; render() }
 })
 
-render()
-hydrateRecipeImages()
-bootstrapCloudSync()
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败。', error))
-  })
-}
+checkAccess()
