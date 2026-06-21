@@ -208,30 +208,23 @@ async function hydrateRecipeImages() {
   render()
 }
 
-function mergeRecipeCollections(localRecipes, cloudRecipes) {
-  const merged = new Map()
-  for (const recipe of [...cloudRecipes, ...localRecipes]) {
-    const key = String(recipe.id)
-    const previous = merged.get(key)
-    if (!previous || String(recipe.modifiedAt || '') >= String(previous.modifiedAt || '')) merged.set(key, recipe)
-  }
-  return [...merged.values()].sort((a, b) => String(b.createdAt || b.id).localeCompare(String(a.createdAt || a.id)))
-}
-
 async function bootstrapCloudSync() {
   const enabled = await initCloud()
   if (!enabled) return
   try {
     const cloudRecipes = await loadCloudLibrary()
-    const merged = mergeRecipeCollections(recipes, cloudRecipes || [])
-    await Promise.all(merged.map(async recipe => {
+    const cloudLibraryExists = Array.isArray(cloudRecipes)
+    const syncedRecipes = cloudLibraryExists ? cloudRecipes : recipes
+    await Promise.all(syncedRecipes.map(async recipe => {
       if (!recipe.imageId) return
       const localBlob = await readImage(recipe.imageId).catch(() => null)
-      if (localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
-      recipe.image = getCloudImageUrl(recipe.imageId)
+      if (!cloudLibraryExists && localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
+      recipe.image = localBlob ? URL.createObjectURL(localBlob) : getCloudImageUrl(recipe.imageId)
     }))
-    recipes = merged
-    persistRecipes()
+    recipes = syncedRecipes
+    const serializable = recipes.map(({ image, ...recipe }) => recipe)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable))
+    if (!cloudLibraryExists) await saveCloudLibrary(serializable)
     render()
   } catch (error) {
     console.warn('云端菜谱读取失败，继续使用本机数据。', error)

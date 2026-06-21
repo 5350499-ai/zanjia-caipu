@@ -1,4 +1,4 @@
-const CACHE_NAME = 'family-recipes-shell-v2'
+const CACHE_NAME = 'family-recipes-shell-v3'
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/src/styles.css', '/src/main.js', '/src/cloud.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png']
 
 self.addEventListener('install', event => {
