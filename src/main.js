@@ -81,7 +81,7 @@ function getFilteredRecipes() {
 }
 
 function authTemplate(message = '') {
-  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="app-password">访问密码</label><input id="app-password" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="请输入密码" required><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="admin-email">管理员账号</label><input id="admin-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="请输入管理员账号" required><label for="app-password">密码</label><input id="app-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
 }
 
 function authLoadingTemplate() {
@@ -610,7 +610,9 @@ root.addEventListener('submit', async event => {
   if (event.target.id !== 'auth-form') return
   event.preventDefault()
   if (authBusy) return
-  const password = new FormData(event.target).get('password')
+  const formData = new FormData(event.target)
+  const email = formData.get('email')
+  const password = formData.get('password')
   authBusy = true
   root.innerHTML = authTemplate()
   try {
@@ -618,7 +620,7 @@ root.addEventListener('submit', async event => {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email, password }),
     })
     const result = await response.json()
     authBusy = false

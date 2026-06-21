@@ -1,4 +1,4 @@
-const { clearSessionCookie, createSessionCookie, hasAuthConfig, isAuthorized, passwordMatches, readJson, sendJson } = require('../lib/server-auth')
+const { clearSessionCookie, createSessionCookie, credentialsMatch, hasAuthConfig, isAuthorized, readJson, sendJson } = require('../lib/server-auth')
 
 module.exports = async function handler(request, response) {
   if (!hasAuthConfig()) return sendJson(response, 503, { error: '访问密码尚未配置' })
@@ -6,8 +6,8 @@ module.exports = async function handler(request, response) {
   if (request.method === 'GET') return sendJson(response, 200, { authenticated: isAuthorized(request) })
 
   if (request.method === 'POST') {
-    const { password = '' } = await readJson(request)
-    if (!passwordMatches(password)) return sendJson(response, 401, { error: '密码不正确' })
+    const { email = '', password = '' } = await readJson(request)
+    if (!credentialsMatch(email, password)) return sendJson(response, 401, { error: '账号或密码不正确' })
     response.setHeader('Set-Cookie', createSessionCookie(request))
     return sendJson(response, 200, { authenticated: true })
   }
