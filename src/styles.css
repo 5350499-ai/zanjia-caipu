@@ -142,6 +142,11 @@ textarea.form-control.tall { min-height: 130px; }
 .secondary-button, .primary-button { height: 54px; border-radius: 5px; font-size: 17px; font-weight: 800; }
 .secondary-button { border: 1px solid #cfc7ba; color: #5d554c; background: #eee9df; }
 .primary-button { border: 1px solid #9c3d2d; color: #fff; background: #9c3d2d; }
+.delete-recipe-button { width: 100%; height: 52px; margin-top: 18px; border: 1px solid #e4b9b2; border-radius: 8px; color: #b03428; background: #fff5f3; font-size: 16px; font-weight: 750; }
+.delete-recipe-button:active { background: #fbe5e1; }
+.delete-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.confirm-delete-button { height: 54px; border: 1px solid #b9362a; border-radius: 8px; color: #fff; background: #b9362a; font-size: 16px; font-weight: 800; }
+.delete-dialog p { color: #8e3c33; }
 
 @media (min-width: 700px) {
   .app-shell { box-shadow: 0 0 70px rgba(42, 36, 29, .2); }

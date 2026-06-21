@@ -35,6 +35,7 @@ let imageMenu = false
 let draft = null
 let draftDirty = false
 let formExitPrompt = false
+let deleteRecipePrompt = false
 let searchIsComposing = false
 let noteEditor = null
 let imagePreview = false
@@ -136,7 +137,8 @@ function newRecipeTemplate() {
       ${formTextarea('tips', '注意事项', '例如：粉丝吸水，汤汁不要收得太干。')}
       ${isEditing ? '' : formTextarea('note', '备注', '记录这次做菜的心得，保存时会自动加入日期。')}
       <div class="form-bottom-actions"><button class="secondary-button" data-action="cancel-form">取消</button><button class="primary-button" data-action="save-recipe">${isEditing ? '保存修改' : '保存'}</button></div>
-    </main>${formExitPrompt ? unsavedChangesDialog() : ''}</div>`
+      ${isEditing ? '<button class="delete-recipe-button" data-action="request-delete-recipe">删除菜谱</button>' : ''}
+    </main>${formExitPrompt ? unsavedChangesDialog() : ''}${deleteRecipePrompt ? deleteRecipeDialog() : ''}</div>`
 }
 
 function formTextarea(key, title, placeholder, tall = false) {
@@ -146,6 +148,7 @@ function formTextarea(key, title, placeholder, tall = false) {
 function actionSheet() { return `<div class="sheet-backdrop" data-action="close-menu"><div class="action-sheet"><div class="sheet-handle"></div><h2>图片操作</h2><button data-action="view-image">查看大图</button><button data-action="replace-image">更换图片</button><button class="danger" data-action="delete-image">删除图片</button><button class="cancel" data-action="close-menu">取消</button></div></div>` }
 function imageLightbox(recipe) { return `<div class="image-lightbox"><button data-action="close-preview" aria-label="关闭大图">${icons.close}</button><div class="image-stage"><img id="preview-image" src="${recipe.image}" alt="${escapeHtml(recipe.name)}大图"></div><p>双击或双指缩放</p></div>` }
 function unsavedChangesDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">是否保存修改？</h2><p>你刚才修改的内容还没有保存。</p><div class="confirm-actions"><button class="discard" data-action="discard-changes">不保存</button><button class="continue" data-action="continue-editing">继续编辑</button><button class="save" data-action="save-and-exit">保存</button></div></div></div>` }
+function deleteRecipeDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-recipe-title"><h2 id="delete-recipe-title">确定要删除这个菜谱吗？</h2><p>删除后无法恢复。</p><div class="delete-confirm-actions"><button class="secondary-button" data-action="cancel-delete-recipe">取消</button><button class="confirm-delete-button" data-action="confirm-delete-recipe">确认删除</button></div></div></div>` }
 
 function notesSection(recipe) {
   const notes = [...recipe.notes].sort((a, b) => b.date.localeCompare(a.date) || String(b.id).localeCompare(String(a.id)))
@@ -332,6 +335,7 @@ function startNewRecipe() {
   page = 'new'
   draftDirty = false
   formExitPrompt = false
+  deleteRecipePrompt = false
   render()
 }
 
@@ -353,6 +357,7 @@ function startEditRecipe() {
   page = 'edit'
   draftDirty = false
   formExitPrompt = false
+  deleteRecipePrompt = false
   render()
 }
 
@@ -409,6 +414,27 @@ async function saveRecipe() {
   draft = null
   draftDirty = false
   formExitPrompt = false
+  render()
+}
+
+async function deleteCurrentRecipe() {
+  const recipeId = draft?.id ?? selectedId
+  const current = recipes.find(recipe => recipe.id === recipeId)
+  if (!current) return
+  const imageId = current.imageId
+  if (imageId) {
+    await Promise.allSettled([removeStoredImage(imageId), deleteCloudImage(imageId)])
+  }
+  if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
+  recipes = recipes.filter(recipe => recipe.id !== recipeId)
+  persistRecipes()
+  selectedId = null
+  draft = null
+  draftDirty = false
+  formExitPrompt = false
+  deleteRecipePrompt = false
+  page = 'home'
+  history.replaceState({ appPage: 'home' }, '')
   render()
 }
 
@@ -698,6 +724,9 @@ root.addEventListener('click', event => {
   }
   if (action === 'edit-recipe') { startEditRecipe(); return }
   if (action === 'save-recipe') { saveRecipe(); return }
+  if (action === 'request-delete-recipe') { deleteRecipePrompt = true; render(); return }
+  if (action === 'cancel-delete-recipe') { deleteRecipePrompt = false; render(); return }
+  if (action === 'confirm-delete-recipe') { deleteCurrentRecipe(); return }
   if (action === 'cancel-form') {
     syncDraftFields()
     if (page === 'edit' && draftDirty) { formExitPrompt = true; render(); return }
