@@ -81,7 +81,7 @@ function getFilteredRecipes() {
 }
 
 function authTemplate(message = '') {
-  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="admin-email">管理员账号</label><input id="admin-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="请输入管理员账号" required><label for="app-password">密码</label><input id="app-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="app-password">请输入访问密码</label><input id="app-password" name="password" type="password" autocomplete="current-password" placeholder="请输入访问密码" required autofocus><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
 }
 
 function authLoadingTemplate() {
@@ -97,7 +97,7 @@ function recipePanelTemplate() {
 
 function homeTemplate() {
   return `<div class="app-shell home-shell">
-    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1></div><div class="header-actions"><div class="recipe-count"><strong>${recipes.length}</strong><span>道家常味</span></div><button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button></div></div>
+    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1></div><div class="header-actions"><div class="recipe-count"><strong>${recipes.length}</strong><span>道家常味</span></div><button class="logout-button" data-action="logout">退出</button><button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button></div></div>
       <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
     <div class="home-body"><main class="recipe-panel">${recipePanelTemplate()}</main></div>
@@ -610,9 +610,7 @@ root.addEventListener('submit', async event => {
   if (event.target.id !== 'auth-form') return
   event.preventDefault()
   if (authBusy) return
-  const formData = new FormData(event.target)
-  const email = formData.get('email')
-  const password = formData.get('password')
+  const password = new FormData(event.target).get('password')
   authBusy = true
   root.innerHTML = authTemplate()
   try {
@@ -620,7 +618,7 @@ root.addEventListener('submit', async event => {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ password }),
     })
     const result = await response.json()
     authBusy = false
@@ -688,6 +686,16 @@ root.addEventListener('click', event => {
   if (action === 'cancel-note') { noteEditor = null; render(); return }
   if (action === 'save-note') { saveNote(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
+  if (action === 'logout') {
+    fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
+      appStarted = false
+      selectedId = null
+      page = 'home'
+      root.innerHTML = authTemplate()
+      document.getElementById('app-password')?.focus()
+    })
+    return
+  }
   if (action === 'edit-recipe') { startEditRecipe(); return }
   if (action === 'save-recipe') { saveRecipe(); return }
   if (action === 'cancel-form') {

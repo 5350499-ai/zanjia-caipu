@@ -193,7 +193,6 @@ textarea.form-control.tall { min-height: 130px; }
 .auth-card > p { margin: 0 0 27px; color: #85796f; font-size: 15px; }
 .auth-card form { text-align: left; }
 .auth-card label { display: block; margin: 0 0 8px 2px; color: #4a413a; font-size: 14px; font-weight: 700; }
-.auth-card input + label { margin-top: 14px; }
 .auth-card input { width: 100%; height: 52px; padding: 0 15px; border: 1px solid #d9d1c7; border-radius: 14px; outline: none; color: #28231f; background: #fff; font-size: 18px; }
 .auth-card input:focus { border-color: #a25244; box-shadow: 0 0 0 3px rgba(162, 82, 68, .12); }
 .auth-card button { width: 100%; height: 52px; border: 0; border-radius: 14px; color: #fff; background: #99483b; font-size: 17px; font-weight: 750; }
@@ -201,6 +200,8 @@ textarea.form-control.tall { min-height: 130px; }
 .auth-error { min-height: 30px; padding: 7px 2px 5px; color: #b13e32; font-size: 13px; }
 .auth-card > small { display: block; margin-top: 18px; color: #948a82; font-size: 12px; }
 .auth-loading > p { margin: 0; }
+.logout-button { height: 34px; padding: 0 7px; border: 0; color: #82776e; background: transparent; font-size: 13px; font-weight: 650; }
+.logout-button:active { color: #99483b; }
 
 /* iOS-style edge swipe feedback */
 .detail-shell { position: relative; z-index: 1; background: #f8f6f1; }
