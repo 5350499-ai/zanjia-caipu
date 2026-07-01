@@ -223,19 +223,6 @@ function scopeTitle() {
   return '我的菜谱'
 }
 
-function scopeButton(id, label) {
-  return `<button data-scope="${escapeHtml(id)}" class="${activeScope === id ? 'active' : ''}">${escapeHtml(label)}</button>`
-}
-
-function scopeNavTemplate() {
-  if (viewingMember) return ''
-  const base = [
-    scopeButton('mine', '我的菜谱'),
-    scopeButton('shared', '家庭共享'),
-  ]
-  return `<nav class="scope-nav" aria-label="查看范围">${base.join('')}</nav>`
-}
-
 function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
   return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
@@ -248,7 +235,13 @@ function settingsMenuTemplate() {
 
 function statsTemplate() {
   const stats = homeStats()
-  return `<div class="home-stats"><span><strong>${stats.mine}</strong> 我的菜谱</span><span><strong>${stats.shared}</strong> 家庭共享</span><span><strong>${stats.members}</strong> 家庭成员</span></div>`
+  const mineActive = !viewingMember && activeScope === 'mine'
+  const sharedActive = !viewingMember && activeScope === 'shared'
+  return `<div class="home-stats">
+    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
+    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+    ${isAdmin() ? `<button type="button" data-action="members"><strong>${stats.members}</strong><span>家庭成员</span></button>` : `<span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>`}
+  </div>`
 }
 
 function homeTemplate() {
@@ -261,7 +254,6 @@ function homeTemplate() {
       ${settingsMenuTemplate()}
       ${statsTemplate()}
       <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
-      ${scopeNavTemplate()}
       <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
@@ -1433,7 +1425,7 @@ root.addEventListener('click', event => {
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
-  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; render(); return }
+  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }

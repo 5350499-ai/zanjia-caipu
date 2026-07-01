@@ -215,12 +215,15 @@ textarea.form-control.tall { min-height: 130px; }
 .header-spacer { min-width: 82px; }
 .recipe-author-line { margin: -8px 0 14px; color: #95897e; font-size: 13px; }
 .home-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: -1px 0 9px; }
-.home-stats span { padding: 7px 6px; border-radius: 10px; color: #7f756a; background: rgba(255,255,255,.66); text-align: center; font-size: 11px; }
+.home-stats button,
+.home-stats > span { min-width: 0; padding: 7px 6px; border: 1px solid transparent; border-radius: 10px; color: #7f756a; background: rgba(255,255,255,.66); text-align: center; font-size: 11px; }
+.home-stats button { appearance: none; cursor: pointer; }
+.home-stats button:active { transform: scale(.98); }
+.home-stats button.active { border-color: rgba(156, 73, 59, .38); color: #7c362d; background: #f2e3dc; box-shadow: inset 0 0 0 1px rgba(156, 73, 59, .08); }
+.home-stats .disabled { opacity: .72; }
 .home-stats strong { display: block; color: #9c493b; font-family: Georgia, serif; font-size: 18px; line-height: 1; }
-.scope-nav { margin: 8px -14px 0; padding: 0 14px 3px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.scope-nav::-webkit-scrollbar { display: none; }
-.scope-nav button { flex: 0 0 auto; height: 30px; padding: 0 10px; border: 0; border-radius: 999px; color: #756c63; background: rgba(255,255,255,.62); font-size: 12px; font-weight: 750; }
-.scope-nav button.active { color: #fff; background: #9c493b; }
+.home-stats span span,
+.home-stats button span { display: block; margin-top: 2px; }
 .detail-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 0 0 12px; }
 .detail-quick-actions button { height: 42px; border: 0; border-radius: 12px; color: #7e3c31; background: #f4e9e3; font-weight: 800; }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 13px; }
