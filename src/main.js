@@ -1,4 +1,4 @@
-import { deleteCloudImage, getCloudImageUrl, initCloud, loadCloudLibrary, saveCloudLibrary, uploadCloudImage } from './cloud.js'
+import { deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, uploadCloudImage } from './cloud.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
@@ -14,23 +14,32 @@ const starterRecipes = [
 const STORAGE_KEY = 'family-recipes-v1'
 const IMAGE_DB_NAME = 'family-recipes-images'
 const IMAGE_STORE = 'images'
+const IMAGE_META_STORE = 'image-meta'
+const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
+const HOME_PRELOAD_LIMIT = 20
+
+function userStorageKey() {
+  return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
+}
 
 function loadRecipes() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    const saved = JSON.parse(localStorage.getItem(userStorageKey()))
     if (Array.isArray(saved)) return saved.map(({ image, ...recipe }) => ({ ...recipe, image: null, notes: (recipe.notes || []).map(note => ({ ...note, id: note.id || uniqueId('note') })) }))
   } catch (error) {
     console.warn('本地菜谱读取失败，将使用初始数据。', error)
   }
-  return starterRecipes
+  return currentUser ? [] : starterRecipes
 }
 
-let recipes = loadRecipes()
+let recipes = []
 
 let activeCategory = '全部'
 let query = ''
 let selectedId = null
 let page = 'home'
+let members = []
+let memberDraft = { loginCode: '', displayName: '', pin: '' }
 let imageMenu = false
 let draft = null
 let draftDirty = false
@@ -42,6 +51,11 @@ let imagePreview = false
 const root = document.getElementById('root')
 let appStarted = false
 let authBusy = false
+let cloudReady = false
+let refreshing = false
+let preloadingImages = false
+let currentUser = null
+const imageObjectUrls = new Map()
 
 const icons = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -58,6 +72,7 @@ function imageArea(recipe, compact = false) {
     return `<div class="image-area placeholder compact"><span class="placeholder-plus" aria-hidden="true">+</span><strong>添加图片</strong></div>`
   }
   if (recipe.image) return `<button class="image-area has-image" data-action="view-image"><img src="${recipe.image}" alt="${escapeHtml(recipe.name)}"></button>`
+  if (page === 'detail' && !canEditRecipe(recipe)) return `<div class="image-area placeholder"><span class="placeholder-plus" aria-hidden="true">+</span><strong>暂无图片</strong></div>`
   return `<button class="image-area placeholder" data-action="add-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>上传这道菜的成品照片</small></button>`
 }
 
@@ -81,8 +96,35 @@ function getFilteredRecipes() {
   })
 }
 
+function isAdmin() {
+  return currentUser?.role === 'admin'
+}
+
+function canEditRecipe(recipe) {
+  return isAdmin() || recipe?.authorUserId === currentUser?.id
+}
+
 function authTemplate(message = '') {
-  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p><form id="auth-form"><label for="app-password">请输入访问密码</label><input id="app-password" name="password" type="password" autocomplete="current-password" placeholder="请输入访问密码" required autofocus><div class="auth-error" role="alert">${escapeHtml(message)}</div><button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button></form><small>登录后 30 天内无需再次输入</small></section></main>`
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
+    <form id="member-login-form" class="login-form">
+      <h2>家庭成员登录</h2>
+      <label for="member-code">账号编号</label>
+      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
+      <label for="member-pin">PIN / 密码</label>
+      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
+      <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
+    </form>
+    <details class="admin-login-panel">
+      <summary>管理员邮箱登录</summary>
+      <form id="admin-login-form" class="login-form">
+        <label for="admin-email">邮箱</label>
+        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
+        <label for="admin-password">密码</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
+        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
+      </form>
+    </details>
+    <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
 
 function authLoadingTemplate() {
@@ -98,11 +140,36 @@ function recipePanelTemplate() {
 
 function homeTemplate() {
   return `<div class="app-shell home-shell">
-    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1></div><div class="header-actions"><div class="recipe-count"><strong>${recipes.length}</strong><span>道家常味</span></div><button class="logout-button" data-action="logout">退出</button><button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button></div></div>
+    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1></div><div class="header-actions"><div class="recipe-count"><strong>${recipes.length}</strong><span>道家常味</span></div>${isAdmin() ? '<button class="logout-button" data-action="members">成员</button>' : ''}<button class="logout-button" data-action="logout">退出</button><button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button></div></div>
       <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
-    <div class="home-body"><main class="recipe-panel">${recipePanelTemplate()}</main></div>
+    <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
+}
+
+function membersTemplate() {
+  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">家庭成员</div><span class="header-spacer"></span></header>
+    <main class="recipe-form">
+      <section class="form-section">
+        <div class="form-label"><strong>新增成员账号</strong><span>仅管理员可创建</span></div>
+        <input class="form-control" id="member-login-code" placeholder="账号编号，例如 001" value="${escapeHtml(memberDraft.loginCode)}">
+        <input class="form-control member-field" id="member-display-name" placeholder="显示名称，例如 孩子1" value="${escapeHtml(memberDraft.displayName)}">
+        <input class="form-control member-field" id="member-pin-new" type="password" placeholder="PIN / 密码，至少 4 位" value="${escapeHtml(memberDraft.pin)}">
+        <button class="primary-button member-create-button" data-action="create-member">创建账号</button>
+      </section>
+      <section class="form-section">
+        <div class="form-label"><strong>已有成员</strong><span>${members.length} 个账号</span></div>
+        <div class="member-list">${members.map(member => `<article class="member-card">
+          <div><strong>${escapeHtml(member.displayName)}</strong><span>${escapeHtml(member.loginCode)} · ${member.role === 'admin' ? '管理员' : '成员'} · ${member.isActive ? '正常' : '已停用'}</span></div>
+          ${member.role === 'admin' ? '' : `<div class="member-actions">
+            <button data-member-toggle="${member.id}">${member.isActive ? '停用' : '启用'}</button>
+            <button data-member-pin="${member.id}">改 PIN</button>
+            <button data-member-rename="${member.id}">改名</button>
+            <button class="danger-text" data-member-delete="${member.id}">删除</button>
+          </div>`}
+        </article>`).join('') || '<p class="empty-copy">还没有家庭成员账号。</p>'}</div>
+      </section>
+    </main></div>`
 }
 
 function section(number, title, body) {
@@ -110,8 +177,9 @@ function section(number, title, body) {
 }
 
 function detailTemplate(recipe) {
-  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div><button class="header-edit" data-action="edit-recipe">编辑菜谱</button></header>
+  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${canEditRecipe(recipe) ? '<button class="header-edit" data-action="edit-recipe">编辑菜谱</button>' : '<span class="header-spacer"></span>'}</header>
     <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ' · 家庭共享' : ''}</div>
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
       ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
       ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
@@ -131,6 +199,7 @@ function newRecipeTemplate() {
       </section>
       <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
       <section class="form-section"><div class="form-label"><strong>分类</strong><span>可多选</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
+      <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>家庭共享</strong><small>开启后，家人都能看到；只有创建者和管理员可以修改。</small></span></label></section>
       ${formTextarea('ingredients', '材料', '每行一种材料，例如：\n豆腐 1块\n香肠 1根')}
       ${formTextarea('seasonings', '调料', '每行一种调料，例如：\n生抽 2勺\n盐 少许')}
       ${formTextarea('steps', '制作步骤', '每行一个步骤，保存后自动编号', true)}
@@ -165,87 +234,266 @@ function splitLines(text) { return text.split('\n').map(item => item.trim()).fil
 function uniqueId(prefix = 'id') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` }
 
 function persistRecipes() {
-  const serializable = recipes.map(({ image, ...recipe }) => recipe)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable))
+  const serializable = serializeRecipes()
+  localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
   saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
+}
+
+function serializeRecipes(list = recipes) {
+  return list.map(({ image, ...recipe }) => recipe)
+}
+
+function recipeImageCacheKey(recipeOrImageId, version = '') {
+  if (!recipeOrImageId) return null
+  if (typeof recipeOrImageId === 'object') {
+    if (!recipeOrImageId.imageId) return null
+    return recipeOrImageId.imageVersion ? `${recipeOrImageId.imageId}@${recipeOrImageId.imageVersion}` : recipeOrImageId.imageId
+  }
+  return version ? `${recipeOrImageId}@${version}` : recipeOrImageId
+}
+
+function setRecipeImageFromBlob(recipe, blob) {
+  if (!recipe || !blob) return
+  const key = recipeImageCacheKey(recipe)
+  if (!key) return
+  const existing = imageObjectUrls.get(key)
+  if (existing) {
+    recipe.image = existing
+    return
+  }
+  if (recipe.image?.startsWith('blob:')) URL.revokeObjectURL(recipe.image)
+  const objectUrl = URL.createObjectURL(blob)
+  imageObjectUrls.set(key, objectUrl)
+  recipe.image = objectUrl
+}
+
+function clearRecipeImage(recipe) {
+  if (!recipe) return
+  if (recipe.image?.startsWith('blob:')) URL.revokeObjectURL(recipe.image)
+  recipe.image = null
 }
 
 function openImageDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IMAGE_DB_NAME, 1)
+    const request = indexedDB.open(IMAGE_DB_NAME, 2)
     request.onupgradeneeded = () => {
       const database = request.result
       if (!database.objectStoreNames.contains(IMAGE_STORE)) database.createObjectStore(IMAGE_STORE)
+      if (!database.objectStoreNames.contains(IMAGE_META_STORE)) database.createObjectStore(IMAGE_META_STORE)
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
 }
 
-async function storeImage(imageId, file) {
+async function storeImage(imageId, file, version = '') {
+  const cacheKey = recipeImageCacheKey(imageId, version)
+  if (!cacheKey) return
   const database = await openImageDatabase()
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(IMAGE_STORE, 'readwrite')
-    transaction.objectStore(IMAGE_STORE).put(file, imageId)
+    transaction.objectStore(IMAGE_STORE).put(file, cacheKey)
+    transaction.oncomplete = async () => {
+      database.close()
+      await writeImageMeta(cacheKey, file).catch(error => console.warn('图片缓存元数据写入失败。', error))
+      pruneImageCache().catch(error => console.warn('图片缓存清理失败。', error))
+      resolve()
+    }
+    transaction.onerror = () => { database.close(); reject(transaction.error) }
+  })
+}
+
+async function writeImageMeta(cacheKey, blob) {
+  const database = await openImageDatabase()
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(IMAGE_META_STORE, 'readwrite')
+    transaction.objectStore(IMAGE_META_STORE).put({
+      size: blob?.size || 0,
+      type: blob?.type || 'image/jpeg',
+      lastAccessed: Date.now(),
+    }, cacheKey)
     transaction.oncomplete = () => { database.close(); resolve() }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
   })
 }
 
-async function readImage(imageId) {
+async function touchImageMeta(cacheKey, blob) {
+  if (!cacheKey || !blob) return
+  await writeImageMeta(cacheKey, blob)
+}
+
+async function readImage(imageId, version = '') {
+  const cacheKey = recipeImageCacheKey(imageId, version)
+  if (!cacheKey) return null
   const database = await openImageDatabase()
   return new Promise((resolve, reject) => {
-    const request = database.transaction(IMAGE_STORE, 'readonly').objectStore(IMAGE_STORE).get(imageId)
-    request.onsuccess = () => { database.close(); resolve(request.result || null) }
+    const request = database.transaction(IMAGE_STORE, 'readonly').objectStore(IMAGE_STORE).get(cacheKey)
+    request.onsuccess = () => {
+      const blob = request.result || null
+      database.close()
+      if (blob) touchImageMeta(cacheKey, blob).catch(() => null)
+      resolve(blob)
+    }
     request.onerror = () => { database.close(); reject(request.error) }
   })
 }
 
-async function removeStoredImage(imageId) {
-  if (!imageId) return
+async function removeStoredImage(imageId, version = '') {
+  const cacheKey = recipeImageCacheKey(imageId, version)
+  if (!cacheKey) return
+  const objectUrl = imageObjectUrls.get(cacheKey)
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl)
+    imageObjectUrls.delete(cacheKey)
+  }
   const database = await openImageDatabase()
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(IMAGE_STORE, 'readwrite')
-    transaction.objectStore(IMAGE_STORE).delete(imageId)
+    const transaction = database.transaction([IMAGE_STORE, IMAGE_META_STORE], 'readwrite')
+    transaction.objectStore(IMAGE_STORE).delete(cacheKey)
+    transaction.objectStore(IMAGE_META_STORE).delete(cacheKey)
     transaction.oncomplete = () => { database.close(); resolve() }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
   })
 }
 
-async function hydrateRecipeImages() {
-  await Promise.all(recipes.map(async recipe => {
+async function listImageMeta() {
+  const database = await openImageDatabase()
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(IMAGE_META_STORE, 'readonly').objectStore(IMAGE_META_STORE).getAllKeys()
+    request.onsuccess = () => {
+      const keys = request.result || []
+      const transaction = database.transaction(IMAGE_META_STORE, 'readonly')
+      const store = transaction.objectStore(IMAGE_META_STORE)
+      const items = []
+      if (!keys.length) {
+        database.close()
+        resolve(items)
+        return
+      }
+      let pending = keys.length
+      keys.forEach(key => {
+        const metaRequest = store.get(key)
+        metaRequest.onsuccess = () => {
+          items.push({ key, ...(metaRequest.result || {}) })
+          pending -= 1
+          if (!pending) {
+            database.close()
+            resolve(items)
+          }
+        }
+        metaRequest.onerror = () => {
+          pending -= 1
+          if (!pending) {
+            database.close()
+            resolve(items)
+          }
+        }
+      })
+    }
+    request.onerror = () => { database.close(); reject(request.error) }
+  })
+}
+
+async function pruneImageCache() {
+  const items = await listImageMeta()
+  let total = items.reduce((sum, item) => sum + Number(item.size || 0), 0)
+  if (total <= IMAGE_CACHE_LIMIT) return
+  const removable = items.sort((a, b) => Number(a.lastAccessed || 0) - Number(b.lastAccessed || 0))
+  for (const item of removable) {
+    if (total <= IMAGE_CACHE_LIMIT) break
+    await removeStoredImage(item.key)
+    total -= Number(item.size || 0)
+  }
+}
+
+async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true) {
+  await Promise.all(targetRecipes.map(async recipe => {
     if (!recipe.imageId) return
     try {
-      const blob = await readImage(recipe.imageId)
-      if (blob) recipe.image = URL.createObjectURL(blob)
+      const blob = await readImage(recipe.imageId, recipe.imageVersion)
+      if (blob) setRecipeImageFromBlob(recipe, blob)
     } catch (error) {
       console.warn('图片读取失败。', error)
     }
   }))
-  render()
+  if (shouldRender) render()
 }
 
-async function bootstrapCloudSync() {
-  const enabled = await initCloud()
-  if (!enabled) return
+function recipesChanged(nextRecipes) {
+  return JSON.stringify(serializeRecipes(recipes)) !== JSON.stringify(serializeRecipes(nextRecipes))
+}
+
+async function cacheRecipeImage(recipe) {
+  if (!recipe?.imageId || !cloudReady) return false
+  const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
+  if (cached) {
+    setRecipeImageFromBlob(recipe, cached)
+    return true
+  }
+  const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
+  if (!blob) return false
+  await storeImage(recipe.imageId, blob, recipe.imageVersion)
+  setRecipeImageFromBlob(recipe, blob)
+  return true
+}
+
+async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
+  if (!cloudReady || preloadingImages) return
+  preloadingImages = true
+  const targets = getFilteredRecipes().filter(recipe => recipe.imageId && !recipe.image).slice(0, limit)
+  try {
+    for (const recipe of targets) {
+      try {
+        await cacheRecipeImage(recipe)
+        if (page === 'home') updateSearchResults()
+      } catch (error) {
+        console.warn('图片预加载失败。', error)
+      }
+    }
+  } finally {
+    preloadingImages = false
+  }
+}
+
+async function syncCloudLibrary({ force = false } = {}) {
+  if (!cloudReady) return
   try {
     const cloudRecipes = await loadCloudLibrary()
     const cloudLibraryExists = Array.isArray(cloudRecipes)
-    const syncedRecipes = cloudLibraryExists ? cloudRecipes : recipes
+    const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
     await Promise.all(syncedRecipes.map(async recipe => {
       if (!recipe.imageId) return
-      const localBlob = await readImage(recipe.imageId).catch(() => null)
+      const localBlob = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
       if (!cloudLibraryExists && localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
-      recipe.image = localBlob ? URL.createObjectURL(localBlob) : getCloudImageUrl(recipe.imageId)
+      if (localBlob) setRecipeImageFromBlob(recipe, localBlob)
     }))
+    const shouldRender = force || recipesChanged(syncedRecipes)
     recipes = syncedRecipes
-    const serializable = recipes.map(({ image, ...recipe }) => recipe)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable))
+    const serializable = serializeRecipes()
+    localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
     if (!cloudLibraryExists) await saveCloudLibrary(serializable)
-    render()
+    if (shouldRender) render()
+    preloadHomeImages().catch(error => console.warn('首页图片预加载失败。', error))
   } catch (error) {
     console.warn('云端菜谱读取失败，继续使用本机数据。', error)
   }
+}
+
+async function bootstrapCloudSync() {
+  cloudReady = await initCloud()
+  if (!cloudReady) return
+  await syncCloudLibrary()
+}
+
+async function refreshFromCloud() {
+  if (refreshing) return
+  refreshing = true
+  render()
+  if (!cloudReady) cloudReady = await initCloud()
+  await syncCloudLibrary({ force: true })
+  refreshing = false
+  render()
+  preloadHomeImages().catch(error => console.warn('刷新后图片预加载失败。', error))
 }
 
 function setupImagePreviewInteractions() {
@@ -331,7 +579,7 @@ function setupImagePreviewInteractions() {
 }
 
 function startNewRecipe() {
-  draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false }
+  draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
   page = 'new'
   draftDirty = false
   formExitPrompt = false
@@ -353,6 +601,7 @@ function startEditRecipe() {
     imageFile: null,
     imageId: recipe.imageId || null,
     removeImage: false,
+    isFamilyShared: Boolean(recipe.isFamilyShared),
   }
   page = 'edit'
   draftDirty = false
@@ -374,10 +623,13 @@ async function saveRecipe() {
   const current = isEditing ? recipes.find(recipe => recipe.id === draft.id) : null
   const id = isEditing ? current.id : Date.now()
   let imageId = draft.imageId || null
+  let imageVersion = current?.imageVersion || null
   if (draft.imageFile) {
     imageId = imageId || uniqueId(`recipe-${id}`)
+    imageVersion = now.toISOString()
     try {
-      await storeImage(imageId, draft.imageFile)
+      if (current?.imageId) await removeStoredImage(current.imageId, current.imageVersion).catch(() => null)
+      await storeImage(imageId, draft.imageFile, imageVersion)
       await uploadCloudImage(imageId, draft.imageFile).catch(error => console.warn('图片云端上传失败。', error))
       if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
     } catch (error) {
@@ -387,10 +639,11 @@ async function saveRecipe() {
   }
   if (draft.removeImage && imageId) {
     try {
-      await removeStoredImage(imageId)
+      await removeStoredImage(imageId, imageVersion)
       await deleteCloudImage(imageId).catch(error => console.warn('云端图片删除失败。', error))
       if (current?.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
       imageId = null
+      imageVersion = null
     } catch (error) {
       window.alert('图片删除失败，请稍后重试。')
       return
@@ -403,6 +656,12 @@ async function saveRecipe() {
     notes: isEditing ? current.notes : (draft.note.trim() ? [{ id: uniqueId('note'), date, text: draft.note.trim() }] : []),
     image: draft.removeImage ? null : draft.image,
     imageId,
+    imageVersion,
+    authorUserId: current?.authorUserId || currentUser?.id,
+    authorName: current?.authorName || currentUser?.displayName || '家人',
+    familyId: current?.familyId || currentUser?.familyId,
+    isFamilyShared: Boolean(draft.isFamilyShared),
+    createdByRole: current?.createdByRole || currentUser?.role || 'member',
     createdAt: current?.createdAt || now.toISOString(), modifiedAt: now.toISOString(),
   }
   recipes = isEditing ? recipes.map(item => item.id === id ? recipe : item) : [recipe, ...recipes]
@@ -423,11 +682,12 @@ async function deleteCurrentRecipe() {
   if (!current) return
   const imageId = current.imageId
   if (imageId) {
-    await Promise.allSettled([removeStoredImage(imageId), deleteCloudImage(imageId)])
+    await Promise.allSettled([removeStoredImage(imageId, current.imageVersion), deleteCloudImage(imageId)])
   }
   if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
   recipes = recipes.filter(recipe => recipe.id !== recipeId)
   persistRecipes()
+  deleteCloudRecipe(recipeId).catch(error => console.warn('云端菜谱删除失败。', error))
   selectedId = null
   draft = null
   draftDirty = false
@@ -449,12 +709,16 @@ function leaveFormWithoutSaving() {
 
 function syncDraftFields() {
   document.querySelectorAll('[data-draft]').forEach(field => { draft[field.dataset.draft] = field.value })
+  const shared = document.getElementById('draft-family-shared')
+  if (shared) draft.isFamilyShared = shared.checked
 }
 
 function updateSearchResults() {
   const panel = document.querySelector('.recipe-panel')
-  if (panel) panel.innerHTML = recipePanelTemplate()
+  if (panel) panel.innerHTML = `<div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}`
   document.querySelector('.clear-search')?.classList.toggle('hidden', !query)
+  requestAnimationFrame(setupPullToRefresh)
+  preloadHomeImages().catch(() => null)
 }
 
 function centerActiveCategory() {
@@ -497,6 +761,78 @@ function deleteNote(noteId) {
   recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, notes: recipe.notes.filter(note => String(note.id) !== String(noteId)), modifiedAt: new Date().toISOString() } : recipe)
   noteEditor = null
   persistRecipes()
+  render()
+}
+
+async function loadMembers() {
+  if (!isAdmin()) return
+  try {
+    const response = await fetch('/api/members', { credentials: 'same-origin', cache: 'no-store' })
+    const data = await response.json()
+    if (response.ok) members = data.members || []
+  } catch (error) {
+    console.warn('成员列表读取失败。', error)
+  }
+}
+
+async function openMembersPage() {
+  if (!isAdmin()) return
+  await loadMembers()
+  page = 'members'
+  render()
+}
+
+function syncMemberDraft() {
+  memberDraft = {
+    loginCode: document.getElementById('member-login-code')?.value.trim() || '',
+    displayName: document.getElementById('member-display-name')?.value.trim() || '',
+    pin: document.getElementById('member-pin-new')?.value || '',
+  }
+}
+
+async function createMember() {
+  syncMemberDraft()
+  const response = await fetch('/api/members', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(memberDraft),
+  })
+  const data = await response.json()
+  if (!response.ok) {
+    window.alert(data.error || '创建成员失败')
+    return
+  }
+  memberDraft = { loginCode: '', displayName: '', pin: '' }
+  await loadMembers()
+  render()
+}
+
+async function updateMember(id, changes) {
+  const response = await fetch('/api/members', {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...changes }),
+  })
+  const data = await response.json()
+  if (!response.ok) {
+    window.alert(data.error || '保存成员失败')
+    return
+  }
+  await loadMembers()
+  render()
+}
+
+async function deleteMember(id) {
+  if (!window.confirm('确定删除这个成员账号吗？删除后该账号不能再登录。')) return
+  const response = await fetch(`/api/members?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' })
+  const data = await response.json()
+  if (!response.ok) {
+    window.alert(data.error || '删除成员失败')
+    return
+  }
+  await loadMembers()
   render()
 }
 
@@ -577,22 +913,70 @@ function setupEdgeSwipeBack() {
   shell.addEventListener('touchcancel', finish, { passive: true })
 }
 
+function setupPullToRefresh() {
+  const panel = document.querySelector('.recipe-panel')
+  const indicator = document.querySelector('.pull-refresh-indicator')
+  if (!panel || !indicator || panel.dataset.pullReady) return
+  panel.dataset.pullReady = '1'
+  let tracking = false
+  let startY = 0
+  let pullDistance = 0
+
+  panel.addEventListener('touchstart', event => {
+    if (refreshing || page !== 'home' || panel.scrollTop > 0 || event.touches.length !== 1) return
+    tracking = true
+    pullDistance = 0
+    startY = event.touches[0].clientY
+  }, { passive: true })
+
+  panel.addEventListener('touchmove', event => {
+    if (!tracking || event.touches.length !== 1) return
+    pullDistance = Math.max(0, event.touches[0].clientY - startY)
+    if (!pullDistance) return
+    const visualDistance = Math.min(74, pullDistance * .45)
+    indicator.classList.add('visible')
+    indicator.style.transform = `translateY(${visualDistance}px)`
+    indicator.textContent = pullDistance > 86 ? '松开刷新' : '下拉刷新'
+  }, { passive: true })
+
+  const finish = () => {
+    if (!tracking) return
+    const shouldRefresh = pullDistance > 86
+    tracking = false
+    indicator.style.transform = ''
+    if (shouldRefresh) refreshFromCloud()
+    else {
+      indicator.classList.remove('visible')
+      indicator.textContent = '下拉刷新'
+    }
+  }
+  panel.addEventListener('touchend', finish, { passive: true })
+  panel.addEventListener('touchcancel', finish, { passive: true })
+}
+
 function render(preserveFocus = false) {
   if (page === 'new' || page === 'edit') root.innerHTML = newRecipeTemplate()
+  else if (page === 'members') root.innerHTML = membersTemplate()
   else if (page === 'detail') root.innerHTML = detailTemplate(recipes.find(recipe => recipe.id === selectedId))
   else root.innerHTML = homeTemplate()
   if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
   if (imagePreview) setupImagePreviewInteractions()
   if (page === 'detail') setupEdgeSwipeBack()
-  if (page === 'home') requestAnimationFrame(centerActiveCategory)
+  if (page === 'home') requestAnimationFrame(() => {
+    centerActiveCategory()
+    setupPullToRefresh()
+    preloadHomeImages().catch(() => null)
+  })
 }
 
 async function startApplication() {
   if (appStarted) return
   appStarted = true
   history.replaceState({ appPage: 'home' }, '')
+  recipes = loadRecipes()
+  await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), false)
   render()
-  await hydrateRecipeImages()
+  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
   await bootstrapCloudSync()
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败。', error))
 }
@@ -614,7 +998,10 @@ async function checkAccess() {
   try {
     const response = await fetch('/api/auth', { cache: 'no-store', credentials: 'same-origin' })
     const result = await response.json()
-    if (response.ok && result.authenticated) return startApplication()
+    if (response.ok && result.authenticated) {
+      currentUser = result.user
+      return startApplication()
+    }
     root.innerHTML = authTemplate(response.status === 503 ? result.error : '')
   } catch {
     root.innerHTML = authTemplate('暂时无法验证访问，请检查网络后重试')
@@ -633,10 +1020,14 @@ root.addEventListener('input', event => {
 })
 
 root.addEventListener('submit', async event => {
-  if (event.target.id !== 'auth-form') return
+  if (event.target.id !== 'member-login-form' && event.target.id !== 'admin-login-form') return
   event.preventDefault()
   if (authBusy) return
-  const password = new FormData(event.target).get('password')
+  const formData = new FormData(event.target)
+  const isAdmin = event.target.id === 'admin-login-form'
+  const payload = isAdmin
+    ? { mode: 'admin', email: formData.get('email'), password: formData.get('password') }
+    : { mode: 'member', loginCode: formData.get('loginCode'), pin: formData.get('pin') }
   authBusy = true
   root.innerHTML = authTemplate()
   try {
@@ -644,13 +1035,16 @@ root.addEventListener('submit', async event => {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(payload),
     })
     const result = await response.json()
     authBusy = false
-    if (response.ok) return startApplication()
-    root.innerHTML = authTemplate(result.error || '密码不正确')
-    document.getElementById('app-password')?.focus()
+    if (response.ok) {
+      currentUser = result.user
+      return startApplication()
+    }
+    root.innerHTML = authTemplate(result.error || '登录失败')
+    document.getElementById(isAdmin ? 'admin-email' : 'member-code')?.focus()
   } catch {
     authBusy = false
     root.innerHTML = authTemplate('网络连接失败，请稍后重试')
@@ -673,6 +1067,11 @@ root.addEventListener('compositionend', event => {
 })
 
 root.addEventListener('change', async event => {
+  if (event.target.id === 'draft-family-shared' && draft) {
+    draft.isFamilyShared = event.target.checked
+    draftDirty = true
+    return
+  }
   const file = event.target.files?.[0]
   if (!file) return
   if (event.target.id === 'draft-file-input') {
@@ -686,11 +1085,13 @@ root.addEventListener('change', async event => {
   if (event.target.id === 'file-input') {
     const current = recipes.find(recipe => recipe.id === selectedId)
     const imageId = current.imageId || uniqueId(`recipe-${current.id}`)
+    const imageVersion = new Date().toISOString()
     try {
-      await storeImage(imageId, file)
+      if (current.imageId) await removeStoredImage(current.imageId, current.imageVersion).catch(() => null)
+      await storeImage(imageId, file, imageVersion)
       await uploadCloudImage(imageId, file).catch(error => console.warn('图片云端上传失败。', error))
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-      recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, image: URL.createObjectURL(file), imageId, modifiedAt: new Date().toISOString() } : recipe)
+      recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, image: URL.createObjectURL(file), imageId, imageVersion, modifiedAt: new Date().toISOString() } : recipe)
       persistRecipes()
       render()
     } catch (error) {
@@ -700,7 +1101,7 @@ root.addEventListener('change', async event => {
 })
 
 root.addEventListener('click', event => {
-  const target = event.target.closest('[data-action], [data-category], [data-recipe], [data-draft-category], [data-edit-note], [data-delete-note]')
+  const target = event.target.closest('[data-action], [data-category], [data-recipe], [data-draft-category], [data-edit-note], [data-delete-note], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]')
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; render(); return }
@@ -708,21 +1109,43 @@ root.addEventListener('click', event => {
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
   if (target.dataset.editNote) { openNoteEditor(target.dataset.editNote); return }
   if (target.dataset.deleteNote) { deleteNote(target.dataset.deleteNote); return }
+  if (target.dataset.memberToggle) {
+    const member = members.find(item => item.id === target.dataset.memberToggle)
+    if (member) updateMember(member.id, { isActive: !member.isActive })
+    return
+  }
+  if (target.dataset.memberPin) {
+    const pin = window.prompt('请输入新的 PIN / 密码，至少 4 位')
+    if (pin) updateMember(target.dataset.memberPin, { pin })
+    return
+  }
+  if (target.dataset.memberRename) {
+    const member = members.find(item => item.id === target.dataset.memberRename)
+    const displayName = window.prompt('请输入新的显示名称', member?.displayName || '')
+    if (displayName) updateMember(target.dataset.memberRename, { displayName })
+    return
+  }
+  if (target.dataset.memberDelete) { deleteMember(target.dataset.memberDelete); return }
   if (action === 'add-note') { openNoteEditor(); return }
   if (action === 'cancel-note') { noteEditor = null; render(); return }
   if (action === 'save-note') { saveNote(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
+  if (action === 'members') { openMembersPage(); return }
+  if (action === 'create-member') { createMember(); return }
   if (action === 'logout') {
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
       appStarted = false
       selectedId = null
+      currentUser = null
+      recipes = []
+      members = []
       page = 'home'
       root.innerHTML = authTemplate()
-      document.getElementById('app-password')?.focus()
+      document.getElementById('member-code')?.focus()
     })
     return
   }
-  if (action === 'edit-recipe') { startEditRecipe(); return }
+  if (action === 'edit-recipe') { if (canEditRecipe(recipes.find(recipe => recipe.id === selectedId))) startEditRecipe(); return }
   if (action === 'save-recipe') { saveRecipe(); return }
   if (action === 'request-delete-recipe') { deleteRecipePrompt = true; render(); return }
   if (action === 'cancel-delete-recipe') { deleteRecipePrompt = false; render(); return }
@@ -748,17 +1171,22 @@ root.addEventListener('click', event => {
   }
   if (action === 'clear') { query = ''; const search = document.getElementById('search'); if (search) { search.value = ''; search.focus() } updateSearchResults(); return }
   if (action === 'back-home') { goHome(); return }
-  if (action === 'add-image' && page === 'detail') { document.getElementById('file-input')?.click(); return }
+  if (action === 'add-image' && page === 'detail') {
+    if (!canEditRecipe(recipes.find(recipe => recipe.id === selectedId))) return
+    document.getElementById('file-input')?.click()
+    return
+  }
   if (action === 'add-image') { openRecipe(Number(target.closest('[data-recipe]')?.dataset.recipe)); return }
-  if (action === 'image-menu' && page === 'detail') { event.stopPropagation(); imageMenu = true; render(); return }
+  if (action === 'image-menu' && page === 'detail') { if (!canEditRecipe(recipes.find(recipe => recipe.id === selectedId))) return; event.stopPropagation(); imageMenu = true; render(); return }
   if (action === 'close-menu' && (target === event.target || target.classList.contains('cancel'))) { imageMenu = false; render(); return }
   if (action === 'replace-image') { imageMenu = false; render(); setTimeout(() => document.getElementById('file-input')?.click()); return }
   if (action === 'delete-image') {
     const current = recipes.find(recipe => recipe.id === selectedId)
-    removeStoredImage(current.imageId).catch(error => console.warn('图片删除失败。', error))
+    if (!canEditRecipe(current)) return
+    removeStoredImage(current.imageId, current.imageVersion).catch(error => console.warn('图片删除失败。', error))
     deleteCloudImage(current.imageId).catch(error => console.warn('云端图片删除失败。', error))
     if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-    recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, image: null, imageId: null, modifiedAt: new Date().toISOString() } : recipe)
+    recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, image: null, imageId: null, imageVersion: null, modifiedAt: new Date().toISOString() } : recipe)
     persistRecipes()
     imageMenu = false
     render()

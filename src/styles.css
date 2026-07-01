@@ -197,6 +197,11 @@ textarea.form-control.tall { min-height: 130px; }
 .auth-card h1 { margin: 5px 0 3px; color: #28221d; font-size: 30px; }
 .auth-card > p { margin: 0 0 27px; color: #85796f; font-size: 15px; }
 .auth-card form { text-align: left; }
+.login-form { display: grid; gap: 8px; }
+.login-form h2 { margin: 0 0 4px; color: #2b251f; font-size: 18px; }
+.admin-login-panel { margin-top: 16px; text-align: left; }
+.admin-login-panel summary { color: #8f473b; font-size: 14px; font-weight: 750; cursor: pointer; }
+.admin-login-panel .login-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee7dc; }
 .auth-card label { display: block; margin: 0 0 8px 2px; color: #4a413a; font-size: 14px; font-weight: 700; }
 .auth-card input { width: 100%; height: 52px; padding: 0 15px; border: 1px solid #d9d1c7; border-radius: 14px; outline: none; color: #28231f; background: #fff; font-size: 18px; }
 .auth-card input:focus { border-color: #a25244; box-shadow: 0 0 0 3px rgba(162, 82, 68, .12); }
@@ -207,6 +212,23 @@ textarea.form-control.tall { min-height: 130px; }
 .auth-loading > p { margin: 0; }
 .logout-button { height: 34px; padding: 0 7px; border: 0; color: #82776e; background: transparent; font-size: 13px; font-weight: 650; }
 .logout-button:active { color: #99483b; }
+.header-spacer { min-width: 82px; }
+.recipe-author-line { margin: -8px 0 14px; color: #95897e; font-size: 13px; }
+.share-toggle { display: flex; gap: 12px; align-items: flex-start; }
+.share-toggle input { width: 22px; height: 22px; margin-top: 2px; accent-color: #9c3d2d; }
+.share-toggle span { display: grid; gap: 4px; }
+.share-toggle strong { color: #2d2822; font-size: 17px; }
+.share-toggle small { color: #82776e; font-size: 13px; line-height: 1.5; }
+.member-field { margin-top: 10px; }
+.member-create-button { width: 100%; margin-top: 12px; }
+.member-list { display: grid; gap: 10px; }
+.member-card { padding: 13px; border: 1px solid #ece5da; border-radius: 12px; background: #fbfaf7; }
+.member-card > div:first-child { display: grid; gap: 4px; }
+.member-card strong { color: #28231f; font-size: 17px; }
+.member-card span { color: #887d72; font-size: 13px; }
+.member-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.member-actions button { min-height: 38px; padding: 0 10px; border: 0; border-radius: 9px; color: #5f564d; background: #eee9df; font-size: 14px; font-weight: 750; }
+.member-actions button.danger-text { color: #ad3b2b; background: #f7e8e4; }
 
 /* iOS-style edge swipe feedback */
 .detail-shell { position: relative; z-index: 1; background: #f8f6f1; }
@@ -319,6 +341,25 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 .category-nav button.active { color: #fff; background: #39332d; }
 .category-nav button.active::before, .category-nav button i { display: none; }
 .recipe-panel { height: 100%; padding: 12px 12px calc(90px + env(safe-area-inset-bottom)); }
+.pull-refresh-indicator {
+  height: 0;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  color: #8a8278;
+  font-size: 13px;
+  font-weight: 650;
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity .16s ease, transform .16s ease;
+  pointer-events: none;
+}
+.pull-refresh-indicator.visible {
+  height: 28px;
+  margin-top: -4px;
+  margin-bottom: 6px;
+  opacity: 1;
+}
 .list-heading { margin: 0 2px 10px; }
 .list-heading h2 { font-size: 18px; }
 .recipe-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }

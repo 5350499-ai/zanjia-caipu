@@ -4,6 +4,9 @@ const path = require('path')
 const os = require('os')
 const authHandler = require('./api/auth')
 const configHandler = require('./api/config')
+const recipesHandler = require('./api/recipes')
+const membersHandler = require('./api/members')
+const imagesHandler = require('./api/images')
 
 const root = __dirname
 const port = 5173
@@ -15,6 +18,9 @@ const server = http.createServer(async (req, res) => {
   const requestPath = decodeURIComponent(req.url.split('?')[0])
   if (requestPath === '/api/auth') return authHandler(req, res)
   if (requestPath === '/api/config') return configHandler(req, res)
+  if (requestPath === '/api/recipes') return recipesHandler(req, res)
+  if (requestPath === '/api/members') return membersHandler(req, res)
+  if (requestPath === '/api/images') return imagesHandler(req, res)
   const target = path.normalize(path.join(root, requestPath === '/' ? 'index.html' : requestPath))
   if (!target.startsWith(root)) { res.writeHead(403); return res.end('Forbidden') }
   fs.readFile(target, (error, data) => {
