@@ -146,6 +146,10 @@ function canEditRecipe(recipe) {
   return isAdmin() || sameId(recipe?.authorUserId, currentUser?.id)
 }
 
+function canViewRecipe(recipe) {
+  return Boolean(recipe && (isAdmin() || sameId(recipe.authorUserId, currentUser?.id) || recipe.isFamilyShared))
+}
+
 function isFavorite(recipe) {
   return Boolean(currentUser?.id && (recipe?.favoriteUserIds || []).includes(currentUser.id))
 }
@@ -208,7 +212,7 @@ function authLoadingTemplate() {
 function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
   return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : scopeTitle()}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
-    ${filtered.map(recipe => `<article class="recipe-card" data-recipe="${recipe.id}">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
+    ${filtered.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>没有找到相关菜谱</h3><p>换个菜名或材料试试</p></div>`}</div>`
 }
 
@@ -1143,7 +1147,7 @@ async function saveCookRecord() {
 function openRecipe(recipeId) {
   const viewedAt = new Date().toISOString()
   const recipe = findRecipeById(recipeId)
-  if (!recipe) return
+  if (!canViewRecipe(recipe)) return
   recipes = recipes.map(recipe => sameId(recipe.id, recipeId) ? { ...recipe, lastViewedAt: viewedAt } : recipe)
   persistRecipes()
   selectedId = recipeId
@@ -1266,8 +1270,8 @@ function render(preserveFocus = false) {
   else if (page === 'members') root.innerHTML = membersTemplate()
   else if (page === 'detail') {
     const recipe = findRecipeById(selectedId)
-    root.innerHTML = recipe ? detailTemplate(recipe) : homeTemplate()
-    if (!recipe) { page = 'home'; selectedId = null }
+    root.innerHTML = canViewRecipe(recipe) ? detailTemplate(recipe) : homeTemplate()
+    if (!canViewRecipe(recipe)) { page = 'home'; selectedId = null }
   }
   else root.innerHTML = homeTemplate()
   if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
@@ -1425,11 +1429,12 @@ root.addEventListener('change', async event => {
 })
 
 root.addEventListener('click', event => {
-  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-draft-category], [data-draft-tag], [data-edit-note], [data-delete-note], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
+  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-draft-tag], [data-edit-note], [data-delete-note], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
   if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; render(); return }
+  if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
   if (target.dataset.draftTag) { syncDraftFields(); const tag = target.dataset.draftTag; draft.tags = draft.tags.includes(tag) ? draft.tags.filter(item => item !== tag) : [...draft.tags, tag]; draftDirty = true; render(); return }
