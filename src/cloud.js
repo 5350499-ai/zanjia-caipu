@@ -6,6 +6,7 @@ export async function loadCloudLibrary() {
   const response = await fetch('/api/recipes', { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw new Error(`Cloud read failed: ${response.status}`)
   const data = await response.json()
+  window.__familyRecipeStats = data.stats || null
   return data.recipes || []
 }
 

@@ -11,6 +11,11 @@ function toClient(row) {
     steps: row.steps || [],
     tips: row.tips || '',
     notes: row.notes || [],
+    tags: row.tags || [],
+    favoriteUserIds: row.favorite_user_ids || [],
+    cookRecords: row.cook_records || [],
+    cookCount: row.cook_count || 0,
+    lastCookedAt: row.last_cooked_at || null,
     image: null,
     imageId: row.image_id || null,
     imageVersion: row.image_version || null,
@@ -26,8 +31,8 @@ function toClient(row) {
 }
 
 function toRow(recipe, user, existing = null) {
-  const ownerId = existing?.author_user_id || recipe.authorUserId || user.id
-  const ownerName = existing?.author_name || recipe.authorName || user.displayName
+  const ownerId = existing?.author_user_id || user.id
+  const ownerName = existing?.author_name || user.displayName
   return {
     id: String(recipe.id),
     name: String(recipe.name || '').trim(),
@@ -37,6 +42,11 @@ function toRow(recipe, user, existing = null) {
     steps: recipe.steps || [],
     tips: recipe.tips || '',
     notes: recipe.notes || [],
+    tags: recipe.tags || [],
+    favorite_user_ids: recipe.favoriteUserIds || [],
+    cook_records: recipe.cookRecords || [],
+    cook_count: Number(recipe.cookCount || 0),
+    last_cooked_at: recipe.lastCookedAt || null,
     image_id: recipe.imageId || null,
     image_version: recipe.imageVersion || null,
     author_user_id: ownerId,
@@ -51,13 +61,20 @@ function toRow(recipe, user, existing = null) {
 }
 
 async function loadVisibleRecipes(user) {
-  const select = 'id,name,categories,ingredients,seasonings,steps,tips,notes,image_id,image_version,author_user_id,author_name,family_id,is_family_shared,created_by_role,last_viewed_at,created_at,modified_at'
+  const select = 'id,name,categories,ingredients,seasonings,steps,tips,notes,tags,favorite_user_ids,cook_records,cook_count,last_cooked_at,image_id,image_version,author_user_id,author_name,family_id,is_family_shared,created_by_role,last_viewed_at,created_at,modified_at'
   let query = `?family_id=eq.${encodeFilter(user.familyId)}&select=${select}&order=last_viewed_at.desc.nullslast&order=created_at.desc`
   if (user.role !== 'admin') {
     query += `&or=(author_user_id.eq.${encodeFilter(user.id)},is_family_shared.eq.true)`
   }
   const rows = await request('/rest/v1/recipes', { query })
   return rows.map(toClient)
+}
+
+async function loadFamilyStats(user) {
+  const members = await request('/rest/v1/family_profiles', {
+    query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id`,
+  })
+  return { memberCount: members.length }
 }
 
 async function findRecipe(id) {
@@ -77,7 +94,8 @@ module.exports = async function handler(requestMessage, response) {
 
   if (requestMessage.method === 'GET') {
     const recipes = await loadVisibleRecipes(user)
-    return sendJson(response, 200, { recipes })
+    const stats = await loadFamilyStats(user)
+    return sendJson(response, 200, { recipes, stats })
   }
 
   if (requestMessage.method === 'POST') {

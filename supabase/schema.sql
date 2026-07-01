@@ -52,6 +52,11 @@ create table if not exists public.recipes (
   steps jsonb not null default '[]'::jsonb,
   tips text not null default '',
   notes jsonb not null default '[]'::jsonb,
+  tags jsonb not null default '[]'::jsonb,
+  favorite_user_ids jsonb not null default '[]'::jsonb,
+  cook_records jsonb not null default '[]'::jsonb,
+  cook_count integer not null default 0,
+  last_cooked_at timestamptz,
   image_id text,
   image_version text,
   author_user_id uuid not null references public.family_profiles(id) on delete restrict,
@@ -71,3 +76,5 @@ create index if not exists recipes_family_idx on public.recipes (family_id, crea
 create index if not exists recipes_author_idx on public.recipes (author_user_id);
 create index if not exists recipes_shared_idx on public.recipes (family_id, is_family_shared);
 create index if not exists recipes_image_idx on public.recipes (image_id);
+create index if not exists recipes_last_cooked_idx on public.recipes (family_id, last_cooked_at desc);
+create index if not exists recipes_cook_count_idx on public.recipes (family_id, cook_count desc);

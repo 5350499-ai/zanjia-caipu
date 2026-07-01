@@ -9,13 +9,13 @@ function objectPath(imageId) {
 
 async function findImageRecipe(imageId) {
   const rows = await request('/rest/v1/recipes', {
-    query: `?image_id=eq.${encodeFilter(imageId)}&select=id,author_user_id,family_id,is_family_shared`,
+    query: `?select=id,image_id,author_user_id,family_id,is_family_shared,cook_records`,
   })
-  return rows?.[0] || null
+  return (rows || []).find(row => row.image_id === imageId || (row.cook_records || []).some(record => record.imageId === imageId)) || null
 }
 
 function canRead(user, recipe) {
-  if (!recipe) return true
+  if (!recipe) return false
   if (recipe.family_id !== user.familyId) return false
   return user.role === 'admin' || recipe.author_user_id === user.id || recipe.is_family_shared
 }

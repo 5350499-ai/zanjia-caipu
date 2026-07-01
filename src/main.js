@@ -2,6 +2,7 @@ import { deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loa
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
+const defaultTags = ['早餐', '午餐', '晚餐', '电饭锅', '空气炸锅', '孩子喜欢', '下酒菜', '快手菜']
 
 const starterRecipes = [
   { id: 1, name: '香肠豆腐粉丝烩菜', categories: ['热菜', '肉菜'], ingredients: ['香肠 1根', '北豆腐 1块', '红薯粉丝 1把', '白菜 4片'], seasonings: ['生抽 2勺', '蚝油 1勺', '蒜 3瓣', '盐 少许'], steps: ['粉丝提前用温水泡软，豆腐切块。', '香肠煸出油，放蒜末和白菜炒软。', '加入豆腐、粉丝和一小碗水，调味后炖8分钟。'], tips: '粉丝吸水，汤汁不要收得太干。出锅前尝一下再放盐。', notes: [{ id: 'note-1', date: '2026-06-20', text: '这次水放多了' }, { id: 'note-2', date: '2026-07-03', text: '多放蒜更好吃' }], image: null },
@@ -25,16 +26,32 @@ function userStorageKey() {
 function loadRecipes() {
   try {
     const saved = JSON.parse(localStorage.getItem(userStorageKey()))
-    if (Array.isArray(saved)) return saved.map(({ image, ...recipe }) => ({ ...recipe, image: null, notes: (recipe.notes || []).map(note => ({ ...note, id: note.id || uniqueId('note') })) }))
+    if (Array.isArray(saved)) return saved.map(normalizeRecipe)
   } catch (error) {
     console.warn('本地菜谱读取失败，将使用初始数据。', error)
   }
   return currentUser ? [] : starterRecipes
 }
 
+function normalizeRecipe(recipe) {
+  const { image, ...rest } = recipe
+  return {
+    ...rest,
+    image: null,
+    categories: rest.categories || [],
+    tags: rest.tags || [],
+    notes: (rest.notes || []).map(note => ({ ...note, id: note.id || uniqueId('note') })),
+    favoriteUserIds: rest.favoriteUserIds || [],
+    cookRecords: (rest.cookRecords || []).map(record => ({ ...record, id: record.id || uniqueId('cook') })),
+    cookCount: Number(rest.cookCount || (rest.cookRecords || []).length || 0),
+    lastCookedAt: rest.lastCookedAt || null,
+  }
+}
+
 let recipes = []
 
 let activeCategory = '全部'
+let activeScope = 'mine'
 let query = ''
 let selectedId = null
 let page = 'home'
@@ -47,6 +64,7 @@ let formExitPrompt = false
 let deleteRecipePrompt = false
 let searchIsComposing = false
 let noteEditor = null
+let cookEditor = null
 let imagePreview = false
 const root = document.getElementById('root')
 let appStarted = false
@@ -55,6 +73,7 @@ let cloudReady = false
 let refreshing = false
 let preloadingImages = false
 let currentUser = null
+let familyMemberCount = 0
 const imageObjectUrls = new Map()
 
 const icons = {
@@ -79,21 +98,38 @@ function imageArea(recipe, compact = false) {
 function getFilteredRecipes() {
   const keyword = query.trim().toLowerCase()
   return recipes.filter(recipe => {
+    const scopeMatch = matchScope(recipe)
     const categoryMatch = activeCategory === '全部' || recipe.categories.includes(activeCategory)
     const searchableText = [
       recipe.name,
       ...(recipe.ingredients || []),
       ...(recipe.seasonings || []),
       ...(recipe.steps || []),
+      ...(recipe.tags || []),
       recipe.tips || '',
       ...(recipe.notes || []).map(note => note.text || ''),
+      ...(recipe.cookRecords || []).map(record => `${record.note || ''} ${record.date || ''}`),
     ].join(' ').toLowerCase()
-    return categoryMatch && (!keyword || searchableText.includes(keyword))
+    return scopeMatch && categoryMatch && (!keyword || searchableText.includes(keyword))
   }).sort((a, b) => {
+    if (activeScope === 'recentCooked') return String(b.lastCookedAt || '').localeCompare(String(a.lastCookedAt || ''))
+    if (activeScope === 'mostCooked') return Number(b.cookCount || 0) - Number(a.cookCount || 0)
     const recent = String(b.lastViewedAt || '').localeCompare(String(a.lastViewedAt || ''))
     if (recent) return recent
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
   })
+}
+
+function matchScope(recipe) {
+  if (!currentUser) return true
+  if (activeScope === 'mine') return recipe.authorUserId === currentUser.id
+  if (activeScope === 'all' && isAdmin()) return true
+  if (activeScope === 'shared') return Boolean(recipe.isFamilyShared)
+  if (activeScope === 'favorites') return isFavorite(recipe)
+  if (activeScope === 'recentCooked') return Boolean(recipe.lastCookedAt)
+  if (activeScope === 'mostCooked') return Number(recipe.cookCount || 0) > 0
+  if (activeScope.startsWith('author:') && isAdmin()) return recipe.authorUserId === activeScope.slice(7)
+  return recipe.authorUserId === currentUser.id || recipe.isFamilyShared
 }
 
 function isAdmin() {
@@ -102,6 +138,29 @@ function isAdmin() {
 
 function canEditRecipe(recipe) {
   return isAdmin() || recipe?.authorUserId === currentUser?.id
+}
+
+function isFavorite(recipe) {
+  return Boolean(currentUser?.id && (recipe?.favoriteUserIds || []).includes(currentUser.id))
+}
+
+function homeStats() {
+  return {
+    mine: recipes.filter(recipe => recipe.authorUserId === currentUser?.id).length,
+    shared: recipes.filter(recipe => recipe.isFamilyShared).length,
+    members: familyMemberCount || members.length || (isAdmin() ? 1 : 0),
+  }
+}
+
+function relativeDate(dateText) {
+  if (!dateText) return ''
+  const today = new Date()
+  const date = new Date(dateText)
+  const diff = Math.round((new Date(today.toDateString()) - new Date(date.toDateString())) / 86400000)
+  if (diff === 0) return '今天'
+  if (diff === 1) return '昨天'
+  if (diff > 1) return `${diff}天前`
+  return dateText.slice(0, 10)
 }
 
 function authTemplate(message = '') {
@@ -133,15 +192,52 @@ function authLoadingTemplate() {
 
 function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
-  return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : activeCategory}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
+  return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : scopeTitle()}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
     ${filtered.map(recipe => `<article class="recipe-card" data-recipe="${recipe.id}">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>没有找到相关菜谱</h3><p>换个菜名或材料试试</p></div>`}</div>`
+}
+
+function scopeTitle() {
+  if (activeScope === 'mine') return activeCategory
+  if (activeScope === 'all') return '全部成员'
+  if (activeScope === 'shared') return '家庭共享'
+  if (activeScope === 'favorites') return '我的收藏'
+  if (activeScope === 'recentCooked') return '最近做过'
+  if (activeScope === 'mostCooked') return '最常做'
+  if (activeScope.startsWith('author:')) return members.find(member => member.id === activeScope.slice(7))?.displayName || '成员菜谱'
+  return activeCategory
+}
+
+function scopeButton(id, label) {
+  return `<button data-scope="${escapeHtml(id)}" class="${activeScope === id ? 'active' : ''}">${escapeHtml(label)}</button>`
+}
+
+function scopeNavTemplate() {
+  const base = [
+    scopeButton('mine', '我的菜谱'),
+    scopeButton('shared', '家庭共享'),
+    scopeButton('favorites', '我的收藏'),
+    scopeButton('recentCooked', '最近做过'),
+    scopeButton('mostCooked', '最常做'),
+  ]
+  if (isAdmin()) {
+    base.splice(1, 0, scopeButton('all', '全部成员'))
+    members.forEach(member => base.push(scopeButton(`author:${member.id}`, member.displayName)))
+  }
+  return `<nav class="scope-nav" aria-label="查看范围">${base.join('')}</nav>`
+}
+
+function statsTemplate() {
+  const stats = homeStats()
+  return `<div class="home-stats"><span><strong>${stats.mine}</strong> 我的菜谱</span><span><strong>${stats.shared}</strong> 家庭共享</span><span><strong>${stats.members}</strong> 家庭成员</span></div>`
 }
 
 function homeTemplate() {
   return `<div class="app-shell home-shell">
     <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1></div><div class="header-actions"><div class="recipe-count"><strong>${recipes.length}</strong><span>道家常味</span></div>${isAdmin() ? '<button class="logout-button" data-action="members">成员</button>' : ''}<button class="logout-button" data-action="logout">退出</button><button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button></div></div>
+      ${statsTemplate()}
       <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
+      ${scopeNavTemplate()}
       <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
@@ -179,13 +275,16 @@ function section(number, title, body) {
 function detailTemplate(recipe) {
   return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${canEditRecipe(recipe) ? '<button class="header-edit" data-action="edit-recipe">编辑菜谱</button>' : '<span class="header-spacer"></span>'}</header>
     <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
-      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ' · 家庭共享' : ''}</div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ' · 家庭共享' : ' · 私人菜谱'} · 已做 ${recipe.cookCount || 0} 次</div>
+      <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>
+      ${recipe.tags?.length ? `<div class="detail-tags">${recipe.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
       ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
       ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
       ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
       ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
       ${notesSection(recipe)}
+      ${cookRecordsSection(recipe)}
     </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
 }
 
@@ -199,6 +298,7 @@ function newRecipeTemplate() {
       </section>
       <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
       <section class="form-section"><div class="form-label"><strong>分类</strong><span>可多选</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
+      <section class="form-section"><div class="form-label"><strong>标签</strong><span>可多选</span></div><div class="category-picker tag-picker">${defaultTags.map(tag => `<button type="button" data-draft-tag="${tag}" class="${draft.tags.includes(tag) ? 'selected' : ''}">${tag}</button>`).join('')}</div><input class="form-control tag-custom-input" id="draft-custom-tags" value="${escapeHtml(draft.customTags || '')}" placeholder="自定义标签，用空格或逗号分隔"></section>
       <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>家庭共享</strong><small>开启后，家人都能看到；只有创建者和管理员可以修改。</small></span></label></section>
       ${formTextarea('ingredients', '材料', '每行一种材料，例如：\n豆腐 1块\n香肠 1根')}
       ${formTextarea('seasonings', '调料', '每行一种调料，例如：\n生抽 2勺\n盐 少许')}
@@ -221,16 +321,35 @@ function deleteRecipeDialog() { return `<div class="confirm-backdrop"><div class
 
 function notesSection(recipe) {
   const notes = [...recipe.notes].sort((a, b) => b.date.localeCompare(a.date) || String(b.id).localeCompare(String(a.id)))
+  const editable = canEditRecipe(recipe)
   const form = noteEditor ? `<div class="note-editor">
     <label for="note-date"><span>日期</span><input id="note-date" type="date" value="${noteEditor.date}"></label>
     <label for="note-text"><span>备注内容</span><textarea id="note-text" placeholder="记录这次做菜的心得……">${escapeHtml(noteEditor.text)}</textarea></label>
     <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-note">取消</button><button class="primary-button" data-action="save-note">保存备注</button></div>
   </div>` : ''
-  const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time><div class="note-actions"><button data-edit-note="${note.id}">编辑</button><button class="danger-text" data-delete-note="${note.id}">删除</button></div></div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有备注，做完这道菜后记一笔吧。</p>'
-  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>历史备注</h2></div><div class="recipe-section-body"><div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>${form}${list}</div></section>`
+  const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time>${editable ? `<div class="note-actions"><button data-edit-note="${note.id}">编辑</button><button class="danger-text" data-delete-note="${note.id}">删除</button></div>` : ''}</div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有备注，做完这道菜后记一笔吧。</p>'
+  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
 }
+
+function cookRecordsSection(recipe) {
+  const editable = canEditRecipe(recipe)
+  const records = [...(recipe.cookRecords || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)))
+  const form = cookEditor ? `<div class="note-editor cook-editor">
+    <label for="cook-date"><span>做菜时间</span><input id="cook-date" type="date" value="${cookEditor.date}"></label>
+    <label for="cook-note"><span>这次记录</span><textarea id="cook-note" placeholder="例如：今天面太硬，下次多加一点水。">${escapeHtml(cookEditor.note)}</textarea></label>
+    <label for="cook-rating"><span>这次评分</span><select id="cook-rating">${[0,1,2,3,4,5].map(value => `<option value="${value}" ${Number(cookEditor.rating || 0) === value ? 'selected' : ''}>${value ? `${value} 星` : '不评分'}</option>`).join('')}</select></label>
+    ${cookEditor.image ? `<button class="record-photo has-image" data-action="choose-cook-image"><img src="${cookEditor.image}" alt="这次做菜图片"><span>更换图片</span></button>` : `<button class="record-photo placeholder" data-action="choose-cook-image"><span class="placeholder-plus">+</span><strong>添加这次图片</strong></button>`}
+    <input id="cook-file-input" class="hidden-input" type="file" accept="image/*">
+    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">取消</button><button class="primary-button" data-action="save-cook-record">保存记录</button></div>
+  </div>` : ''
+  const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
+  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span></div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
+  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>06</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
+}
+
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
 function splitLines(text) { return text.split('\n').map(item => item.trim()).filter(Boolean) }
+function splitTags(text) { return String(text || '').split(/[\s,，、]+/).map(item => item.trim()).filter(Boolean) }
 function uniqueId(prefix = 'id') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` }
 
 function persistRecipes() {
@@ -240,7 +359,10 @@ function persistRecipes() {
 }
 
 function serializeRecipes(list = recipes) {
-  return list.map(({ image, ...recipe }) => recipe)
+  return list.map(({ image, ...recipe }) => ({
+    ...recipe,
+    cookRecords: (recipe.cookRecords || []).map(({ image: recordImage, imageFile, ...record }) => record),
+  }))
 }
 
 function recipeImageCacheKey(recipeOrImageId, version = '') {
@@ -408,10 +530,16 @@ async function pruneImageCache() {
 
 async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true) {
   await Promise.all(targetRecipes.map(async recipe => {
-    if (!recipe.imageId) return
     try {
-      const blob = await readImage(recipe.imageId, recipe.imageVersion)
-      if (blob) setRecipeImageFromBlob(recipe, blob)
+      if (recipe.imageId) {
+        const blob = await readImage(recipe.imageId, recipe.imageVersion)
+        if (blob) setRecipeImageFromBlob(recipe, blob)
+      }
+      await Promise.all((recipe.cookRecords || []).map(async record => {
+        if (!record.imageId) return
+        const blob = await readImage(record.imageId, record.imageVersion)
+        if (blob) setRecordImageFromBlob(record, blob)
+      }))
     } catch (error) {
       console.warn('图片读取失败。', error)
     }
@@ -419,22 +547,53 @@ async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true)
   if (shouldRender) render()
 }
 
+function setRecordImageFromBlob(record, blob) {
+  if (!record || !blob || !record.imageId) return
+  const key = recipeImageCacheKey(record.imageId, record.imageVersion)
+  const existing = imageObjectUrls.get(key)
+  if (existing) {
+    record.image = existing
+    return
+  }
+  if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
+  const objectUrl = URL.createObjectURL(blob)
+  imageObjectUrls.set(key, objectUrl)
+  record.image = objectUrl
+}
+
 function recipesChanged(nextRecipes) {
   return JSON.stringify(serializeRecipes(recipes)) !== JSON.stringify(serializeRecipes(nextRecipes))
 }
 
 async function cacheRecipeImage(recipe) {
-  if (!recipe?.imageId || !cloudReady) return false
-  const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
-  if (cached) {
-    setRecipeImageFromBlob(recipe, cached)
-    return true
+  if (!recipe || !cloudReady) return false
+  let changed = false
+  if (recipe.imageId && !recipe.image) {
+    const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
+    if (cached) setRecipeImageFromBlob(recipe, cached)
+    else {
+      const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
+      if (blob) {
+        await storeImage(recipe.imageId, blob, recipe.imageVersion)
+        setRecipeImageFromBlob(recipe, blob)
+      }
+    }
+    changed = true
   }
-  const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
-  if (!blob) return false
-  await storeImage(recipe.imageId, blob, recipe.imageVersion)
-  setRecipeImageFromBlob(recipe, blob)
-  return true
+  for (const record of (recipe.cookRecords || [])) {
+    if (!record.imageId || record.image) continue
+    const cached = await readImage(record.imageId, record.imageVersion).catch(() => null)
+    if (cached) setRecordImageFromBlob(record, cached)
+    else {
+      const blob = await downloadCloudImage(record.imageId, record.imageVersion)
+      if (blob) {
+        await storeImage(record.imageId, blob, record.imageVersion)
+        setRecordImageFromBlob(record, blob)
+      }
+    }
+    changed = true
+  }
+  return changed
 }
 
 async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
@@ -459,13 +618,20 @@ async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
     const cloudRecipes = await loadCloudLibrary()
+    if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
     await Promise.all(syncedRecipes.map(async recipe => {
-      if (!recipe.imageId) return
-      const localBlob = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
-      if (!cloudLibraryExists && localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
-      if (localBlob) setRecipeImageFromBlob(recipe, localBlob)
+      if (recipe.imageId) {
+        const localBlob = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
+        if (!cloudLibraryExists && localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
+        if (localBlob) setRecipeImageFromBlob(recipe, localBlob)
+      }
+      await Promise.all((recipe.cookRecords || []).map(async record => {
+        if (!record.imageId) return
+        const localBlob = await readImage(record.imageId, record.imageVersion).catch(() => null)
+        if (localBlob) setRecordImageFromBlob(record, localBlob)
+      }))
     }))
     const shouldRender = force || recipesChanged(syncedRecipes)
     recipes = syncedRecipes
@@ -579,7 +745,7 @@ function setupImagePreviewInteractions() {
 }
 
 function startNewRecipe() {
-  draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
+  draft = { name: '', categories: [], tags: [], customTags: '', ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
   page = 'new'
   draftDirty = false
   formExitPrompt = false
@@ -593,6 +759,8 @@ function startEditRecipe() {
     id: recipe.id,
     name: recipe.name,
     categories: [...recipe.categories],
+    tags: [...(recipe.tags || [])],
+    customTags: (recipe.tags || []).filter(tag => !defaultTags.includes(tag)).join(' '),
     ingredients: recipe.ingredients.join('\n'),
     seasonings: recipe.seasonings.join('\n'),
     steps: recipe.steps.join('\n'),
@@ -651,9 +819,14 @@ async function saveRecipe() {
   }
   const recipe = {
     id, name: draft.name.trim(), categories: [...draft.categories],
+    tags: [...new Set([...(draft.tags || []), ...splitTags(draft.customTags)].filter(Boolean))],
     ingredients: splitLines(draft.ingredients), seasonings: splitLines(draft.seasonings), steps: splitLines(draft.steps),
     tips: draft.tips.trim(),
     notes: isEditing ? current.notes : (draft.note.trim() ? [{ id: uniqueId('note'), date, text: draft.note.trim() }] : []),
+    favoriteUserIds: current?.favoriteUserIds || [],
+    cookRecords: current?.cookRecords || [],
+    cookCount: current?.cookCount || 0,
+    lastCookedAt: current?.lastCookedAt || null,
     image: draft.removeImage ? null : draft.image,
     imageId,
     imageVersion,
@@ -711,6 +884,8 @@ function syncDraftFields() {
   document.querySelectorAll('[data-draft]').forEach(field => { draft[field.dataset.draft] = field.value })
   const shared = document.getElementById('draft-family-shared')
   if (shared) draft.isFamilyShared = shared.checked
+  const customTags = document.getElementById('draft-custom-tags')
+  if (customTags) draft.customTags = customTags.value
 }
 
 function updateSearchResults() {
@@ -737,6 +912,7 @@ function openNoteEditor(noteId = null) {
 }
 
 function saveNote() {
+  if (!canEditRecipe(recipes.find(recipe => String(recipe.id) === String(selectedId)))) return
   const dateInput = document.getElementById('note-date')
   const textInput = document.getElementById('note-text')
   const date = dateInput?.value
@@ -757,6 +933,7 @@ function saveNote() {
 }
 
 function deleteNote(noteId) {
+  if (!canEditRecipe(recipes.find(recipe => String(recipe.id) === String(selectedId)))) return
   if (!window.confirm('确定删除这条备注吗？')) return
   recipes = recipes.map(recipe => recipe.id === selectedId ? { ...recipe, notes: recipe.notes.filter(note => String(note.id) !== String(noteId)), modifiedAt: new Date().toISOString() } : recipe)
   noteEditor = null
@@ -769,7 +946,10 @@ async function loadMembers() {
   try {
     const response = await fetch('/api/members', { credentials: 'same-origin', cache: 'no-store' })
     const data = await response.json()
-    if (response.ok) members = data.members || []
+    if (response.ok) {
+      members = data.members || []
+      familyMemberCount = members.length
+    }
   } catch (error) {
     console.warn('成员列表读取失败。', error)
   }
@@ -836,9 +1016,90 @@ async function deleteMember(id) {
   render()
 }
 
+function toggleFavorite() {
+  recipes = recipes.map(recipe => {
+    if (String(recipe.id) !== String(selectedId)) return recipe
+    const set = new Set(recipe.favoriteUserIds || [])
+    if (set.has(currentUser.id)) set.delete(currentUser.id)
+    else set.add(currentUser.id)
+    return { ...recipe, favoriteUserIds: [...set], modifiedAt: new Date().toISOString() }
+  })
+  persistRecipes()
+  render()
+}
+
+function copySelectedRecipe() {
+  const source = recipes.find(recipe => String(recipe.id) === String(selectedId))
+  if (!source) return
+  const now = new Date().toISOString()
+  const copy = {
+    ...source,
+    id: Date.now(),
+    name: `${source.name}（改良版）`,
+    image: null,
+    imageId: null,
+    imageVersion: null,
+    authorUserId: currentUser.id,
+    authorName: currentUser.displayName || '家人',
+    familyId: currentUser.familyId,
+    isFamilyShared: false,
+    createdByRole: currentUser.role,
+    favoriteUserIds: [],
+    cookRecords: [],
+    cookCount: 0,
+    lastCookedAt: null,
+    lastViewedAt: now,
+    createdAt: now,
+    modifiedAt: now,
+  }
+  recipes = [copy, ...recipes]
+  persistRecipes()
+  selectedId = copy.id
+  page = 'detail'
+  render()
+}
+
+function openCookEditor() {
+  cookEditor = { date: new Date().toLocaleDateString('sv-SE'), note: '', rating: 0, image: null, imageFile: null, imageId: null, imageVersion: null }
+  render()
+  setTimeout(() => document.getElementById('cook-note')?.focus())
+}
+
+async function saveCookRecord() {
+  const current = recipes.find(recipe => String(recipe.id) === String(selectedId))
+  if (!canEditRecipe(current)) return
+  const date = document.getElementById('cook-date')?.value || new Date().toLocaleDateString('sv-SE')
+  const note = document.getElementById('cook-note')?.value.trim() || ''
+  const rating = Number(document.getElementById('cook-rating')?.value || 0)
+  const record = {
+    id: uniqueId('cook'),
+    date,
+    note,
+    rating,
+    image: cookEditor.image,
+    imageId: cookEditor.imageId,
+    imageVersion: cookEditor.imageVersion,
+    createdAt: new Date().toISOString(),
+  }
+  if (cookEditor.imageFile) {
+    record.imageId = record.imageId || uniqueId(`cook-${selectedId}`)
+    record.imageVersion = new Date().toISOString()
+    await storeImage(record.imageId, cookEditor.imageFile, record.imageVersion)
+    await uploadCloudImage(record.imageId, cookEditor.imageFile).catch(error => console.warn('做菜记录图片上传失败。', error))
+  }
+  recipes = recipes.map(recipe => {
+    if (String(recipe.id) !== String(selectedId)) return recipe
+    const cookRecords = [record, ...(recipe.cookRecords || [])]
+    return { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: date, modifiedAt: new Date().toISOString() }
+  })
+  cookEditor = null
+  persistRecipes()
+  render()
+}
+
 function openRecipe(recipeId) {
   const viewedAt = new Date().toISOString()
-  recipes = recipes.map(recipe => recipe.id === recipeId ? { ...recipe, lastViewedAt: viewedAt } : recipe)
+  recipes = recipes.map(recipe => String(recipe.id) === String(recipeId) ? { ...recipe, lastViewedAt: viewedAt } : recipe)
   persistRecipes()
   selectedId = recipeId
   page = 'detail'
@@ -975,6 +1236,7 @@ async function startApplication() {
   history.replaceState({ appPage: 'home' }, '')
   recipes = loadRecipes()
   await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), false)
+  if (isAdmin()) await loadMembers()
   render()
   hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
   await bootstrapCloudSync()
@@ -1082,6 +1344,12 @@ root.addEventListener('change', async event => {
     draftDirty = true
     render()
   }
+  if (event.target.id === 'cook-file-input' && cookEditor) {
+    if (cookEditor.image?.startsWith('blob:')) URL.revokeObjectURL(cookEditor.image)
+    cookEditor.imageFile = file
+    cookEditor.image = URL.createObjectURL(file)
+    render()
+  }
   if (event.target.id === 'file-input') {
     const current = recipes.find(recipe => recipe.id === selectedId)
     const imageId = current.imageId || uniqueId(`recipe-${current.id}`)
@@ -1101,12 +1369,14 @@ root.addEventListener('change', async event => {
 })
 
 root.addEventListener('click', event => {
-  const target = event.target.closest('[data-action], [data-category], [data-recipe], [data-draft-category], [data-edit-note], [data-delete-note], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]')
+  const target = event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-draft-category], [data-draft-tag], [data-edit-note], [data-delete-note], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]')
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; render(); return }
-  if (target.dataset.recipe) { openRecipe(Number(target.dataset.recipe)); return }
+  if (target.dataset.scope) { activeScope = target.dataset.scope; render(); return }
+  if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
+  if (target.dataset.draftTag) { syncDraftFields(); const tag = target.dataset.draftTag; draft.tags = draft.tags.includes(tag) ? draft.tags.filter(item => item !== tag) : [...draft.tags, tag]; draftDirty = true; render(); return }
   if (target.dataset.editNote) { openNoteEditor(target.dataset.editNote); return }
   if (target.dataset.deleteNote) { deleteNote(target.dataset.deleteNote); return }
   if (target.dataset.memberToggle) {
@@ -1129,6 +1399,12 @@ root.addEventListener('click', event => {
   if (action === 'add-note') { openNoteEditor(); return }
   if (action === 'cancel-note') { noteEditor = null; render(); return }
   if (action === 'save-note') { saveNote(); return }
+  if (action === 'toggle-favorite') { toggleFavorite(); return }
+  if (action === 'copy-recipe') { copySelectedRecipe(); return }
+  if (action === 'add-cook-record') { if (canEditRecipe(recipes.find(recipe => String(recipe.id) === String(selectedId)))) openCookEditor(); return }
+  if (action === 'cancel-cook-record') { cookEditor = null; render(); return }
+  if (action === 'save-cook-record') { saveCookRecord(); return }
+  if (action === 'choose-cook-image') { document.getElementById('cook-file-input')?.click(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
   if (action === 'members') { openMembersPage(); return }
   if (action === 'create-member') { createMember(); return }
