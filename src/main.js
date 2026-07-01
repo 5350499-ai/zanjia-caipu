@@ -296,9 +296,14 @@ function section(number, title, body) {
 }
 
 function detailTemplate(recipe) {
+  const editable = canEditRecipe(recipe)
   return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${canEditRecipe(recipe) ? '<button class="header-edit" data-action="edit-recipe">编辑菜谱</button>' : '<span class="header-spacer"></span>'}</header>
     <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
-      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ' · 家庭共享' : ' · 私人菜谱'} · 已做 ${recipe.cookCount || 0} 次</div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
+      <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
+        <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能在「家庭共享」里看到。' : '只有创建者和管理员可以看到。'}</small></div>
+        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
+      </div>
       <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>
       ${recipe.tags?.length ? `<div class="detail-tags">${recipe.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
@@ -1055,6 +1060,17 @@ function toggleFavorite() {
   render()
 }
 
+function toggleFamilyShare() {
+  const current = findRecipeById(selectedId)
+  if (!canEditRecipe(current)) return
+  recipes = recipes.map(recipe => {
+    if (!sameId(recipe.id, selectedId)) return recipe
+    return { ...recipe, isFamilyShared: !recipe.isFamilyShared, modifiedAt: new Date().toISOString() }
+  })
+  persistRecipes()
+  render()
+}
+
 function copySelectedRecipe() {
   const source = findRecipeById(selectedId)
   if (!source) return
@@ -1453,6 +1469,7 @@ root.addEventListener('click', event => {
   if (action === 'cancel-note') { noteEditor = null; render(); return }
   if (action === 'save-note') { saveNote(); return }
   if (action === 'toggle-favorite') { toggleFavorite(); return }
+  if (action === 'toggle-family-share') { toggleFamilyShare(); return }
   if (action === 'copy-recipe') { copySelectedRecipe(); return }
   if (action === 'add-cook-record') { if (canEditRecipe(findRecipeById(selectedId))) openCookEditor(); return }
   if (action === 'cancel-cook-record') { cookEditor = null; render(); return }
