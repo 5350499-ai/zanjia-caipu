@@ -462,6 +462,78 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
   font-size: 24px;
 }
 
+.account-subtitle {
+  margin: 3px 0 0;
+  color: #7f766c;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-action-row {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -2px 0 8px;
+}
+
+.settings-button,
+.secondary-mini-button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.settings-button {
+  border: 1px solid #ded7cd;
+  color: #5f574e;
+  background: #fff;
+}
+
+.secondary-mini-button {
+  border: 1px solid #d5ccc0;
+  color: #7b493f;
+  background: #f3eee7;
+}
+
+.settings-popover {
+  position: absolute;
+  z-index: 15;
+  top: calc(max(10px, env(safe-area-inset-top)) + 78px);
+  right: 14px;
+  width: min(210px, calc(100vw - 28px));
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(69, 54, 38, .1);
+  border-radius: 16px;
+  background: rgba(255, 253, 248, .98);
+  box-shadow: 0 14px 38px rgba(40, 31, 22, .14);
+  backdrop-filter: blur(14px);
+}
+
+.settings-popover button {
+  height: 44px;
+  border: 0;
+  border-radius: 11px;
+  color: #332d27;
+  background: transparent;
+  text-align: left;
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.settings-popover button:active {
+  background: #f2ede6;
+}
+
+.settings-popover .muted {
+  color: #8a8177;
+}
+
 .eyebrow {
   margin-bottom: 1px;
   font-size: 9px;
