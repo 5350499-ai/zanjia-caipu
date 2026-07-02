@@ -2,7 +2,6 @@ import { deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loa
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
-const defaultTags = ['早餐', '午餐', '晚餐', '电饭锅', '空气炸锅', '孩子喜欢', '下酒菜', '快手菜']
 
 const starterRecipes = [
   { id: 1, name: '香肠豆腐粉丝烩菜', categories: ['热菜', '肉菜'], ingredients: ['香肠 1根', '北豆腐 1块', '红薯粉丝 1把', '白菜 4片'], seasonings: ['生抽 2勺', '蚝油 1勺', '蒜 3瓣', '盐 少许'], steps: ['粉丝提前用温水泡软，豆腐切块。', '香肠煸出油，放蒜末和白菜炒软。', '加入豆腐、粉丝和一小碗水，调味后炖8分钟。'], tips: '粉丝吸水，汤汁不要收得太干。出锅前尝一下再放盐。', notes: [{ id: 'note-1', date: '2026-06-20', text: '这次水放多了' }, { id: 'note-2', date: '2026-07-03', text: '多放蒜更好吃' }], image: null },
@@ -39,7 +38,7 @@ function normalizeRecipe(recipe) {
     ...rest,
     image: null,
     categories: rest.categories || [],
-    tags: rest.tags || [],
+    tags: [],
     notes: (rest.notes || []).map(note => ({ ...note, id: note.id || uniqueId('note') })),
     favoriteUserIds: rest.favoriteUserIds || [],
     cookRecords: (rest.cookRecords || []).map(record => ({ ...record, id: record.id || uniqueId('cook') })),
@@ -107,7 +106,6 @@ function getFilteredRecipes() {
       ...(recipe.ingredients || []),
       ...(recipe.seasonings || []),
       ...(recipe.steps || []),
-      ...(recipe.tags || []),
       recipe.tips || '',
       ...(recipe.notes || []).map(note => note.text || ''),
       ...(recipe.cookRecords || []).map(record => `${record.note || ''} ${record.date || ''}`),
@@ -301,7 +299,6 @@ function detailTemplate(recipe) {
         <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
       </div>
       <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>
-      ${recipe.tags?.length ? `<div class="detail-tags">${recipe.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
       ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
       ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
@@ -322,7 +319,6 @@ function newRecipeTemplate() {
       </section>
       <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
       <section class="form-section"><div class="form-label"><strong>分类</strong><span>可多选</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
-      <section class="form-section"><div class="form-label"><strong>标签</strong><span>可多选</span></div><div class="category-picker tag-picker">${defaultTags.map(tag => `<button type="button" data-draft-tag="${tag}" class="${draft.tags.includes(tag) ? 'selected' : ''}">${tag}</button>`).join('')}</div><input class="form-control tag-custom-input" id="draft-custom-tags" value="${escapeHtml(draft.customTags || '')}" placeholder="自定义标签，用空格或逗号分隔"></section>
       <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>家庭共享</strong><small>开启后，家人都能看到；只有创建者和管理员可以修改。</small></span></label></section>
       ${formTextarea('ingredients', '材料', '每行一种材料，例如：\n豆腐 1块\n香肠 1根')}
       ${formTextarea('seasonings', '调料', '每行一种调料，例如：\n生抽 2勺\n盐 少许')}
@@ -364,16 +360,15 @@ function cookRecordsSection(recipe) {
     <label for="cook-rating"><span>这次评分</span><select id="cook-rating">${[0,1,2,3,4,5].map(value => `<option value="${value}" ${Number(cookEditor.rating || 0) === value ? 'selected' : ''}>${value ? `${value} 星` : '不评分'}</option>`).join('')}</select></label>
     ${cookEditor.image ? `<button class="record-photo has-image" data-action="choose-cook-image"><img src="${cookEditor.image}" alt="这次做菜图片"><span>更换图片</span></button>` : `<button class="record-photo placeholder" data-action="choose-cook-image"><span class="placeholder-plus">+</span><strong>添加这次图片</strong></button>`}
     <input id="cook-file-input" class="hidden-input" type="file" accept="image/*">
-    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">取消</button><button class="primary-button" data-action="save-cook-record">保存记录</button></div>
+    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">取消</button><button class="primary-button" data-action="save-cook-record">${cookEditor.id ? '保存修改' : '保存记录'}</button></div>
   </div>` : ''
   const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
-  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span></div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
+  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">编辑</button><button class="danger-text" data-delete-cook="${record.id}">删除</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
   return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>06</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
 }
 
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
 function splitLines(text) { return text.split('\n').map(item => item.trim()).filter(Boolean) }
-function splitTags(text) { return String(text || '').split(/[\s,，、]+/).map(item => item.trim()).filter(Boolean) }
 function uniqueId(prefix = 'id') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` }
 
 function persistRecipes() {
@@ -624,11 +619,11 @@ async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
   if (!cloudReady || preloadingImages) return
   preloadingImages = true
   const targets = getFilteredRecipes().filter(recipe => recipe.imageId && !recipe.image).slice(0, limit)
+  let changed = false
   try {
     for (const recipe of targets) {
       try {
-        await cacheRecipeImage(recipe)
-        if (page === 'home') updateSearchResults()
+        changed = await cacheRecipeImage(recipe) || changed
       } catch (error) {
         console.warn('图片预加载失败。', error)
       }
@@ -636,6 +631,7 @@ async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
   } finally {
     preloadingImages = false
   }
+  if (changed && page === 'home') updateSearchResults()
 }
 
 async function syncCloudLibrary({ force = false } = {}) {
@@ -769,7 +765,7 @@ function setupImagePreviewInteractions() {
 }
 
 function startNewRecipe() {
-  draft = { name: '', categories: [], tags: [], customTags: '', ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
+  draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
   page = 'new'
   viewingMember = null
   settingsMenuOpen = false
@@ -786,8 +782,6 @@ function startEditRecipe() {
     id: recipe.id,
     name: recipe.name,
     categories: [...recipe.categories],
-    tags: [...(recipe.tags || [])],
-    customTags: (recipe.tags || []).filter(tag => !defaultTags.includes(tag)).join(' '),
     ingredients: recipe.ingredients.join('\n'),
     seasonings: recipe.seasonings.join('\n'),
     steps: recipe.steps.join('\n'),
@@ -846,7 +840,7 @@ async function saveRecipe() {
   }
   const recipe = {
     id, name: draft.name.trim(), categories: [...draft.categories],
-    tags: [...new Set([...(draft.tags || []), ...splitTags(draft.customTags)].filter(Boolean))],
+    tags: [],
     ingredients: splitLines(draft.ingredients), seasonings: splitLines(draft.seasonings), steps: splitLines(draft.steps),
     tips: draft.tips.trim(),
     notes: isEditing ? current.notes : (draft.note.trim() ? [{ id: uniqueId('note'), date, text: draft.note.trim() }] : []),
@@ -911,8 +905,6 @@ function syncDraftFields() {
   document.querySelectorAll('[data-draft]').forEach(field => { draft[field.dataset.draft] = field.value })
   const shared = document.getElementById('draft-family-shared')
   if (shared) draft.isFamilyShared = shared.checked
-  const customTags = document.getElementById('draft-custom-tags')
-  if (customTags) draft.customTags = customTags.value
 }
 
 function updateSearchResults() {
@@ -1098,8 +1090,12 @@ function copySelectedRecipe() {
   render()
 }
 
-function openCookEditor() {
-  cookEditor = { date: new Date().toLocaleDateString('sv-SE'), note: '', rating: 0, image: null, imageFile: null, imageId: null, imageVersion: null }
+function openCookEditor(recordId = null) {
+  const current = findRecipeById(selectedId)
+  const record = recordId ? (current?.cookRecords || []).find(item => sameId(item.id, recordId)) : null
+  cookEditor = record
+    ? { id: record.id, date: record.date || new Date().toLocaleDateString('sv-SE'), note: record.note || '', rating: Number(record.rating || 0), image: record.image || null, imageFile: null, imageId: record.imageId || null, imageVersion: record.imageVersion || null }
+    : { id: null, date: new Date().toLocaleDateString('sv-SE'), note: '', rating: 0, image: null, imageFile: null, imageId: null, imageVersion: null }
   render()
   setTimeout(() => document.getElementById('cook-note')?.focus())
 }
@@ -1110,28 +1106,51 @@ async function saveCookRecord() {
   const date = document.getElementById('cook-date')?.value || new Date().toLocaleDateString('sv-SE')
   const note = document.getElementById('cook-note')?.value.trim() || ''
   const rating = Number(document.getElementById('cook-rating')?.value || 0)
+  const existingRecord = cookEditor.id ? (current.cookRecords || []).find(record => sameId(record.id, cookEditor.id)) : null
   const record = {
-    id: uniqueId('cook'),
+    id: cookEditor.id || uniqueId('cook'),
     date,
     note,
     rating,
     image: cookEditor.image,
     imageId: cookEditor.imageId,
     imageVersion: cookEditor.imageVersion,
-    createdAt: new Date().toISOString(),
+    createdAt: existingRecord?.createdAt || new Date().toISOString(),
   }
   if (cookEditor.imageFile) {
     record.imageId = record.imageId || uniqueId(`cook-${selectedId}`)
     record.imageVersion = new Date().toISOString()
+    if (existingRecord?.imageId && existingRecord.imageId !== record.imageId) await removeStoredImage(existingRecord.imageId, existingRecord.imageVersion).catch(() => null)
     await storeImage(record.imageId, cookEditor.imageFile, record.imageVersion)
     await uploadCloudImage(record.imageId, cookEditor.imageFile).catch(error => console.warn('做菜记录图片上传失败。', error))
   }
   recipes = recipes.map(recipe => {
     if (!sameId(recipe.id, selectedId)) return recipe
-    const cookRecords = [record, ...(recipe.cookRecords || [])]
+    const cookRecords = cookEditor.id
+      ? (recipe.cookRecords || []).map(item => sameId(item.id, cookEditor.id) ? record : item)
+      : [record, ...(recipe.cookRecords || [])]
     return { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: date, modifiedAt: new Date().toISOString() }
   })
   cookEditor = null
+  persistRecipes()
+  render()
+}
+
+async function deleteCookRecord(recordId) {
+  const current = findRecipeById(selectedId)
+  if (!canEditRecipe(current)) return
+  const record = (current.cookRecords || []).find(item => sameId(item.id, recordId))
+  if (!record) return
+  if (!window.confirm('确定要删除这条做菜记录吗？')) return
+  if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion), deleteCloudImage(record.imageId)])
+  if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
+  recipes = recipes.map(recipe => {
+    if (!sameId(recipe.id, selectedId)) return recipe
+    const cookRecords = (recipe.cookRecords || []).filter(item => !sameId(item.id, recordId))
+    const latest = [...cookRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0]
+    return { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: latest?.date || null, modifiedAt: new Date().toISOString() }
+  })
+  if (cookEditor?.id && sameId(cookEditor.id, recordId)) cookEditor = null
   persistRecipes()
   render()
 }
@@ -1421,7 +1440,7 @@ root.addEventListener('change', async event => {
 })
 
 root.addEventListener('click', event => {
-  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-draft-tag], [data-edit-note], [data-delete-note], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
+  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
@@ -1429,9 +1448,10 @@ root.addEventListener('click', event => {
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
-  if (target.dataset.draftTag) { syncDraftFields(); const tag = target.dataset.draftTag; draft.tags = draft.tags.includes(tag) ? draft.tags.filter(item => item !== tag) : [...draft.tags, tag]; draftDirty = true; render(); return }
   if (target.dataset.editNote) { openNoteEditor(target.dataset.editNote); return }
   if (target.dataset.deleteNote) { deleteNote(target.dataset.deleteNote); return }
+  if (target.dataset.editCook) { if (canEditRecipe(findRecipeById(selectedId))) openCookEditor(target.dataset.editCook); return }
+  if (target.dataset.deleteCook) { deleteCookRecord(target.dataset.deleteCook); return }
   if (target.dataset.memberView) {
     const member = members.find(item => sameId(item.id, target.dataset.memberView))
     if (member) {
