@@ -393,6 +393,44 @@ function recipeImageCacheKey(recipeOrImageId, version = '') {
   return version ? `${recipeOrImageId}@${version}` : recipeOrImageId
 }
 
+async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {}) {
+  if (!file || !file.type?.startsWith('image/')) throw new Error('请选择图片文件')
+  const sourceUrl = URL.createObjectURL(file)
+  try {
+    const image = new Image()
+    image.decoding = 'async'
+    image.src = sourceUrl
+    if (image.decode) await image.decode()
+    else await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = () => reject(new Error('图片解码失败'))
+    })
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    if (!sourceWidth || !sourceHeight) throw new Error('图片尺寸读取失败')
+    const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight))
+    const width = Math.max(1, Math.round(sourceWidth * scale))
+    const height = Math.max(1, Math.round(sourceHeight * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d', { colorSpace: 'srgb', alpha: false }) || canvas.getContext('2d', { alpha: false })
+    if (!context) throw new Error('浏览器无法处理图片')
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, width, height)
+    context.drawImage(image, 0, 0, width, height)
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(result => result ? resolve(result) : reject(new Error('图片转码失败')), 'image/jpeg', quality)
+    })
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'recipe-image'}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    })
+  } finally {
+    URL.revokeObjectURL(sourceUrl)
+  }
+}
+
 function setRecipeImageFromBlob(recipe, blob) {
   if (!recipe || !blob) return
   const key = recipeImageCacheKey(recipe)
@@ -1407,18 +1445,34 @@ root.addEventListener('change', async event => {
   const file = event.target.files?.[0]
   if (!file) return
   if (event.target.id === 'draft-file-input') {
-    if (draft.imageFile && draft.image?.startsWith('blob:')) URL.revokeObjectURL(draft.image)
-    draft.imageFile = file
-    draft.image = URL.createObjectURL(file)
-    draft.removeImage = false
-    draftDirty = true
-    render()
+    try {
+      const normalizedFile = await normalizeImageFile(file)
+      if (draft.imageFile && draft.image?.startsWith('blob:')) URL.revokeObjectURL(draft.image)
+      draft.imageFile = normalizedFile
+      draft.image = URL.createObjectURL(normalizedFile)
+      draft.removeImage = false
+      draftDirty = true
+      render()
+    } catch (error) {
+      window.alert('图片处理失败，请重新选择一张普通照片。')
+    } finally {
+      event.target.value = ''
+    }
+    return
   }
   if (event.target.id === 'cook-file-input' && cookEditor) {
-    if (cookEditor.image?.startsWith('blob:')) URL.revokeObjectURL(cookEditor.image)
-    cookEditor.imageFile = file
-    cookEditor.image = URL.createObjectURL(file)
-    render()
+    try {
+      const normalizedFile = await normalizeImageFile(file)
+      if (cookEditor.image?.startsWith('blob:')) URL.revokeObjectURL(cookEditor.image)
+      cookEditor.imageFile = normalizedFile
+      cookEditor.image = URL.createObjectURL(normalizedFile)
+      render()
+    } catch (error) {
+      window.alert('图片处理失败，请重新选择一张普通照片。')
+    } finally {
+      event.target.value = ''
+    }
+    return
   }
   if (event.target.id === 'file-input') {
     const current = findRecipeById(selectedId)
@@ -1426,15 +1480,18 @@ root.addEventListener('change', async event => {
     const imageId = current.imageId || uniqueId(`recipe-${current.id}`)
     const imageVersion = new Date().toISOString()
     try {
+      const normalizedFile = await normalizeImageFile(file)
       if (current.imageId) await removeStoredImage(current.imageId, current.imageVersion).catch(() => null)
-      await storeImage(imageId, file, imageVersion)
-      await uploadCloudImage(imageId, file).catch(error => console.warn('图片云端上传失败。', error))
+      await storeImage(imageId, normalizedFile, imageVersion)
+      await uploadCloudImage(imageId, normalizedFile).catch(error => console.warn('图片云端上传失败。', error))
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-      recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? { ...recipe, image: URL.createObjectURL(file), imageId, imageVersion, modifiedAt: new Date().toISOString() } : recipe)
+      recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? { ...recipe, image: URL.createObjectURL(normalizedFile), imageId, imageVersion, modifiedAt: new Date().toISOString() } : recipe)
       persistRecipes()
       render()
     } catch (error) {
-      window.alert('图片保存失败，请重新选择图片。')
+      window.alert('图片处理或保存失败，请重新选择一张普通照片。')
+    } finally {
+      event.target.value = ''
     }
   }
 })
