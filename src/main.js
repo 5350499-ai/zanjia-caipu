@@ -1,4 +1,4 @@
-import { deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
@@ -225,7 +225,7 @@ function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
   return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
     <button data-action="account-info">账号信息</button>
-    ${isAdmin() ? '<button data-action="members">成员管理</button>' : ''}
+    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
     <button data-action="logout">退出登录</button>
     <button class="muted" data-action="close-settings">取消</button>
   </div>`
@@ -375,6 +375,11 @@ function persistRecipes() {
   const serializable = serializeRecipes()
   localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
   saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
+}
+
+async function persistSingleRecipe(recipe) {
+  await saveCloudRecipe(serializeRecipes([recipe])[0])
+  localStorage.setItem(userStorageKey(), JSON.stringify(serializeRecipes()))
 }
 
 function serializeRecipes(list = recipes) {
@@ -849,32 +854,30 @@ async function saveRecipe() {
   const isEditing = page === 'edit'
   const current = isEditing ? findRecipeById(draft.id) : null
   const id = isEditing ? current.id : Date.now()
+  const previousRecipes = recipes
+  const oldImageId = current?.imageId || null
+  const oldImageVersion = current?.imageVersion || null
   let imageId = draft.imageId || null
   let imageVersion = current?.imageVersion || null
+  let uploadedImageId = null
+  let uploadedImageVersion = null
   if (draft.imageFile) {
-    imageId = imageId || uniqueId(`recipe-${id}`)
+    imageId = uniqueId(`recipe-${id}`)
     imageVersion = now.toISOString()
     try {
-      if (current?.imageId) await removeStoredImage(current.imageId, current.imageVersion).catch(() => null)
       await storeImage(imageId, draft.imageFile, imageVersion)
-      await uploadCloudImage(imageId, draft.imageFile).catch(error => console.warn('图片云端上传失败。', error))
-      if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
+      await uploadCloudImage(imageId, draft.imageFile)
+      uploadedImageId = imageId
+      uploadedImageVersion = imageVersion
     } catch (error) {
       window.alert('图片保存失败，请重新选择图片。')
+      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
       return
     }
   }
   if (draft.removeImage && imageId) {
-    try {
-      await removeStoredImage(imageId, imageVersion)
-      await deleteCloudImage(imageId).catch(error => console.warn('云端图片删除失败。', error))
-      if (current?.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-      imageId = null
-      imageVersion = null
-    } catch (error) {
-      window.alert('图片删除失败，请稍后重试。')
-      return
-    }
+    imageId = null
+    imageVersion = null
   }
   const recipe = {
     id, name: draft.name.trim(), categories: [...draft.categories],
@@ -896,8 +899,21 @@ async function saveRecipe() {
     createdByRole: current?.createdByRole || currentUser?.role || 'member',
     createdAt: current?.createdAt || now.toISOString(), modifiedAt: now.toISOString(),
   }
-  recipes = isEditing ? recipes.map(item => sameId(item.id, id) ? recipe : item) : [recipe, ...recipes]
-  persistRecipes()
+  const nextRecipes = isEditing ? recipes.map(item => sameId(item.id, id) ? recipe : item) : [recipe, ...recipes]
+  recipes = nextRecipes
+  try {
+    await persistSingleRecipe(recipe)
+  } catch (error) {
+    recipes = previousRecipes
+    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+    window.alert('菜谱保存失败，原图片已保留。')
+    render()
+    return
+  }
+  if ((draft.imageFile || draft.removeImage) && oldImageId && oldImageId !== imageId) {
+    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+    if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
+  }
   activeCategory = '全部'
   query = ''
   page = isEditing ? 'detail' : 'home'
@@ -912,14 +928,20 @@ async function deleteCurrentRecipe() {
   const recipeId = draft?.id ?? selectedId
   const current = findRecipeById(recipeId)
   if (!current) return
-  const imageId = current.imageId
-  if (imageId) {
-    await Promise.allSettled([removeStoredImage(imageId, current.imageVersion), deleteCloudImage(imageId)])
+  try {
+    await deleteCloudRecipe(recipeId)
+  } catch (error) {
+    window.alert('菜谱删除失败，图片和数据已保留。')
+    return
   }
+  const imageIds = [
+    current.imageId ? { id: current.imageId, version: current.imageVersion } : null,
+    ...(current.cookRecords || []).map(record => record.imageId ? { id: record.imageId, version: record.imageVersion } : null),
+  ].filter(Boolean)
+  await Promise.allSettled(imageIds.map(item => removeStoredImage(item.id, item.version)))
   if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
   recipes = recipes.filter(recipe => !sameId(recipe.id, recipeId))
-  persistRecipes()
-  deleteCloudRecipe(recipeId).catch(error => console.warn('云端菜谱删除失败。', error))
+  localStorage.setItem(userStorageKey(), JSON.stringify(serializeRecipes()))
   selectedId = null
   draft = null
   draftDirty = false
@@ -1141,10 +1163,15 @@ function openCookEditor(recordId = null) {
 async function saveCookRecord() {
   const current = findRecipeById(selectedId)
   if (!canEditRecipe(current)) return
+  const previousRecipes = recipes
   const date = document.getElementById('cook-date')?.value || new Date().toLocaleDateString('sv-SE')
   const note = document.getElementById('cook-note')?.value.trim() || ''
   const rating = Number(document.getElementById('cook-rating')?.value || 0)
   const existingRecord = cookEditor.id ? (current.cookRecords || []).find(record => sameId(record.id, cookEditor.id)) : null
+  const oldImageId = existingRecord?.imageId || null
+  const oldImageVersion = existingRecord?.imageVersion || null
+  let uploadedImageId = null
+  let uploadedImageVersion = null
   const record = {
     id: cookEditor.id || uniqueId('cook'),
     date,
@@ -1156,21 +1183,41 @@ async function saveCookRecord() {
     createdAt: existingRecord?.createdAt || new Date().toISOString(),
   }
   if (cookEditor.imageFile) {
-    record.imageId = record.imageId || uniqueId(`cook-${selectedId}`)
+    record.imageId = uniqueId(`cook-${selectedId}`)
     record.imageVersion = new Date().toISOString()
-    if (existingRecord?.imageId && existingRecord.imageId !== record.imageId) await removeStoredImage(existingRecord.imageId, existingRecord.imageVersion).catch(() => null)
-    await storeImage(record.imageId, cookEditor.imageFile, record.imageVersion)
-    await uploadCloudImage(record.imageId, cookEditor.imageFile).catch(error => console.warn('做菜记录图片上传失败。', error))
+    try {
+      await storeImage(record.imageId, cookEditor.imageFile, record.imageVersion)
+      await uploadCloudImage(record.imageId, cookEditor.imageFile)
+      uploadedImageId = record.imageId
+      uploadedImageVersion = record.imageVersion
+    } catch (error) {
+      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+      window.alert('做菜记录图片保存失败，请重新选择图片。')
+      return
+    }
   }
+  let updatedRecipe = null
   recipes = recipes.map(recipe => {
     if (!sameId(recipe.id, selectedId)) return recipe
     const cookRecords = cookEditor.id
       ? (recipe.cookRecords || []).map(item => sameId(item.id, cookEditor.id) ? record : item)
       : [record, ...(recipe.cookRecords || [])]
-    return { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: date, modifiedAt: new Date().toISOString() }
+    updatedRecipe = { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: date, modifiedAt: new Date().toISOString() }
+    return updatedRecipe
   })
+  try {
+    await persistSingleRecipe(updatedRecipe)
+  } catch (error) {
+    recipes = previousRecipes
+    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+    window.alert('做菜记录保存失败，原图片已保留。')
+    render()
+    return
+  }
+  if (uploadedImageId && oldImageId && oldImageId !== uploadedImageId) {
+    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+  }
   cookEditor = null
-  persistRecipes()
   render()
 }
 
@@ -1180,16 +1227,26 @@ async function deleteCookRecord(recordId) {
   const record = (current.cookRecords || []).find(item => sameId(item.id, recordId))
   if (!record) return
   if (!window.confirm('确定要删除这条做菜记录吗？')) return
-  if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion), deleteCloudImage(record.imageId)])
-  if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
+  const previousRecipes = recipes
+  let updatedRecipe = null
   recipes = recipes.map(recipe => {
     if (!sameId(recipe.id, selectedId)) return recipe
     const cookRecords = (recipe.cookRecords || []).filter(item => !sameId(item.id, recordId))
     const latest = [...cookRecords].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0]
-    return { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: latest?.date || null, modifiedAt: new Date().toISOString() }
+    updatedRecipe = { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: latest?.date || null, modifiedAt: new Date().toISOString() }
+    return updatedRecipe
   })
+  try {
+    await persistSingleRecipe(updatedRecipe)
+  } catch (error) {
+    recipes = previousRecipes
+    window.alert('做菜记录删除失败，图片和数据已保留。')
+    render()
+    return
+  }
+  if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion), deleteCloudImage(record.imageId)])
+  if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
   if (cookEditor?.id && sameId(cookEditor.id, recordId)) cookEditor = null
-  persistRecipes()
   render()
 }
 
@@ -1477,18 +1534,31 @@ root.addEventListener('change', async event => {
   if (event.target.id === 'file-input') {
     const current = findRecipeById(selectedId)
     if (!current) return
-    const imageId = current.imageId || uniqueId(`recipe-${current.id}`)
+    const oldImageId = current.imageId || null
+    const oldImageVersion = current.imageVersion || null
+    const imageId = uniqueId(`recipe-${current.id}`)
     const imageVersion = new Date().toISOString()
     try {
       const normalizedFile = await normalizeImageFile(file)
-      if (current.imageId) await removeStoredImage(current.imageId, current.imageVersion).catch(() => null)
       await storeImage(imageId, normalizedFile, imageVersion)
-      await uploadCloudImage(imageId, normalizedFile).catch(error => console.warn('图片云端上传失败。', error))
+      await uploadCloudImage(imageId, normalizedFile)
+      const updatedRecipe = { ...current, image: URL.createObjectURL(normalizedFile), imageId, imageVersion, modifiedAt: new Date().toISOString() }
+      const previousRecipes = recipes
+      recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? updatedRecipe : recipe)
+      try {
+        await persistSingleRecipe(updatedRecipe)
+      } catch (error) {
+        recipes = previousRecipes
+        await Promise.allSettled([removeStoredImage(imageId, imageVersion), deleteCloudImage(imageId)])
+        window.alert('菜谱保存失败，原图片已保留。')
+        render()
+        return
+      }
+      if (oldImageId && oldImageId !== imageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-      recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? { ...recipe, image: URL.createObjectURL(normalizedFile), imageId, imageVersion, modifiedAt: new Date().toISOString() } : recipe)
-      persistRecipes()
       render()
     } catch (error) {
+      await Promise.allSettled([removeStoredImage(imageId, imageVersion), deleteCloudImage(imageId)])
       window.alert('图片处理或保存失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
@@ -1496,7 +1566,7 @@ root.addEventListener('change', async event => {
   }
 })
 
-root.addEventListener('click', event => {
+root.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) return
   const action = target.dataset.action
@@ -1560,6 +1630,17 @@ root.addEventListener('click', event => {
   }
   if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = '全部'; query = ''; render(); return }
   if (action === 'members') { settingsMenuOpen = false; openMembersPage(); return }
+  if (action === 'cleanup-images') {
+    settingsMenuOpen = false
+    try {
+      const result = await cleanupCloudImages()
+      window.alert(`图片清理完成：扫描 ${result.scanned} 张，删除 ${result.deleted} 张。`)
+    } catch (error) {
+      window.alert('图片清理失败，请稍后重试。')
+    }
+    render()
+    return
+  }
   if (action === 'create-member') { createMember(); return }
   if (action === 'logout') {
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
@@ -1614,11 +1695,21 @@ root.addEventListener('click', event => {
   if (action === 'delete-image') {
     const current = findRecipeById(selectedId)
     if (!canEditRecipe(current)) return
-    removeStoredImage(current.imageId, current.imageVersion).catch(error => console.warn('图片删除失败。', error))
-    deleteCloudImage(current.imageId).catch(error => console.warn('云端图片删除失败。', error))
+    const oldImageId = current.imageId
+    const oldImageVersion = current.imageVersion
+    const previousRecipes = recipes
+    const updatedRecipe = { ...current, image: null, imageId: null, imageVersion: null, modifiedAt: new Date().toISOString() }
+    recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? updatedRecipe : recipe)
+    try {
+      await persistSingleRecipe(updatedRecipe)
+    } catch (error) {
+      recipes = previousRecipes
+      window.alert('图片删除失败，原图片已保留。')
+      render()
+      return
+    }
+    if (oldImageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
     if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
-    recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? { ...recipe, image: null, imageId: null, imageVersion: null, modifiedAt: new Date().toISOString() } : recipe)
-    persistRecipes()
     imageMenu = false
     render()
     return

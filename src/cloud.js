@@ -68,3 +68,12 @@ export async function deleteCloudImage(imageId) {
   if (!response.ok && response.status !== 404) throw new Error(`Image delete failed: ${response.status}`)
   return true
 }
+
+export async function cleanupCloudImages() {
+  const response = await fetch('/api/images?action=cleanup', {
+    method: 'POST',
+    credentials: 'same-origin',
+  })
+  if (!response.ok) throw new Error(`Image cleanup failed: ${response.status}`)
+  return response.json()
+}
