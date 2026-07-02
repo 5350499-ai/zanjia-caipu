@@ -76,6 +76,7 @@ let familyMemberCount = 0
 let viewingMember = null
 let settingsMenuOpen = false
 const imageObjectUrls = new Map()
+const imageRetrying = new Set()
 
 const icons = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -88,10 +89,10 @@ const icons = {
 
 function imageArea(recipe, compact = false) {
   if (compact) {
-    if (recipe.image) return `<div class="image-area has-image compact"><img src="${recipe.image}" alt="${escapeHtml(recipe.name)}"></div>`
+    if (recipe.image) return `<div class="image-area has-image compact"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></div>`
     return `<div class="image-area placeholder compact"><span class="placeholder-plus" aria-hidden="true">+</span><strong>添加图片</strong></div>`
   }
-  if (recipe.image) return `<button class="image-area has-image" data-action="view-image"><img src="${recipe.image}" alt="${escapeHtml(recipe.name)}"></button>`
+  if (recipe.image) return `<button class="image-area has-image" data-action="view-image"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></button>`
   if (page === 'detail' && !canEditRecipe(recipe)) return `<div class="image-area placeholder"><span class="placeholder-plus" aria-hidden="true">+</span><strong>暂无图片</strong></div>`
   return `<button class="image-area placeholder" data-action="add-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>上传这道菜的成品照片</small></button>`
 }
@@ -1574,6 +1575,23 @@ root.addEventListener('change', async event => {
     }
   }
 })
+
+root.addEventListener('error', event => {
+  const image = event.target
+  if (!(image instanceof HTMLImageElement)) return
+  const imageId = image.dataset.imageId
+  if (!imageId || imageRetrying.has(imageId)) return
+  const recipe = recipes.find(item => item.imageId === imageId)
+  if (!recipe) return
+  imageRetrying.add(imageId)
+  removeStoredImage(recipe.imageId, recipe.imageVersion)
+    .catch(() => null)
+    .finally(async () => {
+      clearRecipeImage(recipe)
+      await cacheRecipeImage(recipe).catch(() => null)
+      render()
+    })
+}, true)
 
 root.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
