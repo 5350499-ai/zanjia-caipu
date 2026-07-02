@@ -437,7 +437,7 @@ async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {})
 }
 
 function setRecipeImageFromBlob(recipe, blob) {
-  if (!recipe || !blob) return
+  if (!recipe || !isUsableImageBlob(blob)) return
   const key = recipeImageCacheKey(recipe)
   if (!key) return
   const existing = imageObjectUrls.get(key)
@@ -472,7 +472,7 @@ function openImageDatabase() {
 
 async function storeImage(imageId, file, version = '') {
   const cacheKey = recipeImageCacheKey(imageId, version)
-  if (!cacheKey) return
+  if (!cacheKey || !isUsableImageBlob(file)) return
   const database = await openImageDatabase()
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(IMAGE_STORE, 'readwrite')
@@ -515,6 +515,11 @@ async function readImage(imageId, version = '') {
     request.onsuccess = () => {
       const blob = request.result || null
       database.close()
+      if (blob && !isUsableImageBlob(blob)) {
+        removeStoredImage(imageId, version).catch(() => null)
+        resolve(null)
+        return
+      }
       if (blob) touchImageMeta(cacheKey, blob).catch(() => null)
       resolve(blob)
     }
@@ -610,7 +615,7 @@ async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true)
 }
 
 function setRecordImageFromBlob(record, blob) {
-  if (!record || !blob || !record.imageId) return
+  if (!record || !record.imageId || !isUsableImageBlob(blob)) return
   const key = recipeImageCacheKey(record.imageId, record.imageVersion)
   const existing = imageObjectUrls.get(key)
   if (existing) {
@@ -1219,6 +1224,10 @@ async function saveCookRecord() {
   }
   cookEditor = null
   render()
+}
+
+function isUsableImageBlob(blob) {
+  return Boolean(blob && Number(blob.size || 0) > 0 && String(blob.type || '').startsWith('image/'))
 }
 
 async function deleteCookRecord(recordId) {
