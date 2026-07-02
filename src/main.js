@@ -1,4 +1,4 @@
-import { cleanupCloudImages, deleteCloudImage, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
@@ -871,7 +871,7 @@ async function saveRecipe() {
       uploadedImageVersion = imageVersion
     } catch (error) {
       window.alert('图片保存失败，请重新选择图片。')
-      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
       return
     }
   }
@@ -905,13 +905,13 @@ async function saveRecipe() {
     await persistSingleRecipe(recipe)
   } catch (error) {
     recipes = previousRecipes
-    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
     window.alert('菜谱保存失败，原图片已保留。')
     render()
     return
   }
   if ((draft.imageFile || draft.removeImage) && oldImageId && oldImageId !== imageId) {
-    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
     if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
   }
   activeCategory = '全部'
@@ -1191,7 +1191,7 @@ async function saveCookRecord() {
       uploadedImageId = record.imageId
       uploadedImageVersion = record.imageVersion
     } catch (error) {
-      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
       window.alert('做菜记录图片保存失败，请重新选择图片。')
       return
     }
@@ -1209,13 +1209,13 @@ async function saveCookRecord() {
     await persistSingleRecipe(updatedRecipe)
   } catch (error) {
     recipes = previousRecipes
-    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion), deleteCloudImage(uploadedImageId)])
+    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
     window.alert('做菜记录保存失败，原图片已保留。')
     render()
     return
   }
   if (uploadedImageId && oldImageId && oldImageId !== uploadedImageId) {
-    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
   }
   cookEditor = null
   render()
@@ -1244,7 +1244,7 @@ async function deleteCookRecord(recordId) {
     render()
     return
   }
-  if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion), deleteCloudImage(record.imageId)])
+  if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion)])
   if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
   if (cookEditor?.id && sameId(cookEditor.id, recordId)) cookEditor = null
   render()
@@ -1549,16 +1549,16 @@ root.addEventListener('change', async event => {
         await persistSingleRecipe(updatedRecipe)
       } catch (error) {
         recipes = previousRecipes
-        await Promise.allSettled([removeStoredImage(imageId, imageVersion), deleteCloudImage(imageId)])
+        await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
         window.alert('菜谱保存失败，原图片已保留。')
         render()
         return
       }
-      if (oldImageId && oldImageId !== imageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+      if (oldImageId && oldImageId !== imageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
       render()
     } catch (error) {
-      await Promise.allSettled([removeStoredImage(imageId, imageVersion), deleteCloudImage(imageId)])
+      await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
       window.alert('图片处理或保存失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
@@ -1708,7 +1708,7 @@ root.addEventListener('click', async event => {
       render()
       return
     }
-    if (oldImageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion), deleteCloudImage(oldImageId)])
+    if (oldImageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
     if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
     imageMenu = false
     render()

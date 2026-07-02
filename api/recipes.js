@@ -1,6 +1,5 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
-const { collectRecipeImageIds, deleteStorageImage } = require('../lib/storage-images')
 
 function toClient(row) {
   return {
@@ -118,8 +117,6 @@ module.exports = async function handler(requestMessage, response) {
     const existing = id ? await findRecipe(id) : null
     if (!existing) return sendJson(response, 404, { error: '菜谱不存在' })
     if (!canEdit(user, existing)) return sendJson(response, 403, { error: '没有权限删除这个菜谱' })
-    const imageIds = collectRecipeImageIds(existing)
-    for (const imageId of imageIds) await deleteStorageImage(imageId)
     await request('/rest/v1/recipes', {
       method: 'DELETE',
       query: `?id=eq.${encodeFilter(id)}`,

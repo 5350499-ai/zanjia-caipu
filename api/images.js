@@ -1,6 +1,6 @@
 const { request } = require('../lib/supabase-server')
 const { getSessionUser, readBuffer, sendJson } = require('../lib/server-auth')
-const { deleteStorageImage, downloadStorageImage, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
+const { downloadStorageImage, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
 
 async function findImageRecipe(imageId) {
   const rows = await request('/rest/v1/recipes', {
@@ -40,12 +40,64 @@ async function cleanupOrphanImages(user) {
   if (user.role !== 'admin') return { status: 403, body: { error: '只有管理员可以清理图片' } }
   const [stored, referenced] = await Promise.all([listStorageImages(), referencedImageIds(user.familyId)])
   const orphanIds = stored.filter(imageId => !referenced.has(imageId))
-  const results = await Promise.allSettled(orphanIds.map(deleteStorageImage))
-  const failed = results
-    .map((result, index) => ({ result, imageId: orphanIds[index] }))
-    .filter(item => item.result.status === 'rejected')
-    .map(item => ({ imageId: item.imageId, error: item.result.reason?.message || 'delete failed' }))
-  return { status: failed.length ? 207 : 200, body: { scanned: stored.length, referenced: referenced.size, deleted: orphanIds.length - failed.length, failed } }
+  return {
+    status: 200,
+    body: {
+      dryRun: true,
+      scanned: stored.length,
+      referenced: referenced.size,
+      deleteCandidates: orphanIds,
+      deleted: 0,
+      message: 'Storage 删除已暂停。当前接口只做 dry-run，不会真实删除图片。',
+    },
+  }
+}
+
+async function diagnoseImages(user) {
+  if (user.role !== 'admin') return { status: 403, body: { error: '只有管理员可以诊断图片' } }
+  const rows = await request('/rest/v1/recipes', {
+    query: `?family_id=eq.${encodeURIComponent(user.familyId)}&select=id,name,image_id,image_version,cook_records`,
+  })
+  const checked = []
+  for (const row of rows || []) {
+    if (row.image_id) {
+      const fileResponse = await downloadStorageImage(row.image_id).catch(error => ({ ok: false, status: 0, error }))
+      checked.push({
+        recipeId: row.id,
+        recipeName: row.name,
+        field: 'image_id',
+        imageId: row.image_id,
+        imageVersion: row.image_version || null,
+        ok: Boolean(fileResponse.ok),
+        status: fileResponse.status || 0,
+        error: fileResponse.ok ? null : (fileResponse.error?.message || `Storage returned ${fileResponse.status || 0}`),
+      })
+    }
+    for (const record of row.cook_records || []) {
+      const recordImageId = record?.imageId || record?.image_id
+      if (!recordImageId) continue
+      const fileResponse = await downloadStorageImage(recordImageId).catch(error => ({ ok: false, status: 0, error }))
+      checked.push({
+        recipeId: row.id,
+        recipeName: row.name,
+        field: 'cook_records.imageId',
+        recordId: record.id || null,
+        imageId: recordImageId,
+        imageVersion: record.imageVersion || record.image_version || null,
+        ok: Boolean(fileResponse.ok),
+        status: fileResponse.status || 0,
+        error: fileResponse.ok ? null : (fileResponse.error?.message || `Storage returned ${fileResponse.status || 0}`),
+      })
+    }
+  }
+  return {
+    status: 200,
+    body: {
+      checked: checked.length,
+      ok: checked.filter(item => item.ok).length,
+      broken: checked.filter(item => !item.ok),
+    },
+  }
 }
 
 module.exports = async function handler(requestMessage, response) {
@@ -59,6 +111,15 @@ module.exports = async function handler(requestMessage, response) {
       return sendJson(response, 405, { error: 'Method not allowed' })
     }
     const result = await cleanupOrphanImages(user)
+    return sendJson(response, result.status, result.body)
+  }
+
+  if (url.searchParams.get('action') === 'diagnose') {
+    if (requestMessage.method !== 'GET') {
+      response.setHeader('Allow', 'GET')
+      return sendJson(response, 405, { error: 'Method not allowed' })
+    }
+    const result = await diagnoseImages(user)
     return sendJson(response, result.status, result.body)
   }
 
@@ -88,8 +149,7 @@ module.exports = async function handler(requestMessage, response) {
 
   if (requestMessage.method === 'DELETE') {
     if (!canWrite(user, recipe)) return sendJson(response, 403, { error: '没有权限删除这张图片' })
-    await deleteStorageImage(imageId)
-    return sendJson(response, 200, { ok: true })
+    return sendJson(response, 200, { ok: true, skipped: true, message: 'Storage 删除已暂停，未删除图片。' })
   }
 
   response.setHeader('Allow', 'GET, POST, DELETE')
