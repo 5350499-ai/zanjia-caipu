@@ -39,11 +39,15 @@ export async function deleteCloudRecipe(recipeId) {
 export async function downloadCloudImage(imageId, version = '') {
   if (!imageId) return null
   const versionQuery = version ? `&v=${encodeURIComponent(version)}` : ''
-  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}${versionQuery}`, {
-    cache: 'force-cache',
+  const request = new Request(`/api/images?imageId=${encodeURIComponent(imageId)}${versionQuery}`, {
     credentials: 'same-origin',
   })
+  const cache = await openImageResponseCache()
+  const cached = cache ? await cache.match(request).catch(() => null) : null
+  if (cached?.ok) return cached.blob()
+  const response = await fetch(request, { cache: 'force-cache' })
   if (!response.ok) throw new Error(`Image download failed: ${response.status}`)
+  if (cache) cache.put(request, response.clone()).catch(() => null)
   return response.blob()
 }
 
@@ -76,4 +80,18 @@ export async function cleanupCloudImages() {
   })
   if (!response.ok) throw new Error(`Image cleanup failed: ${response.status}`)
   return response.json()
+}
+
+export async function clearCloudImageResponseCache() {
+  if (typeof caches === 'undefined') return false
+  return caches.delete('family-recipes-image-responses-v1')
+}
+
+async function openImageResponseCache() {
+  if (typeof caches === 'undefined') return null
+  try {
+    return await caches.open('family-recipes-image-responses-v1')
+  } catch {
+    return null
+  }
 }

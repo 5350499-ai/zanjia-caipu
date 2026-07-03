@@ -1,4 +1,4 @@
-import { cleanupCloudImages, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
@@ -15,11 +15,27 @@ const STORAGE_KEY = 'family-recipes-v1'
 const IMAGE_DB_NAME = 'family-recipes-images'
 const IMAGE_STORE = 'images'
 const IMAGE_META_STORE = 'image-meta'
+const RECIPE_META_STORE = 'recipe-meta'
 const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
+const USER_CACHE_KEY = 'family-recipes-last-user'
 
 function userStorageKey() {
   return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
+}
+
+function saveCachedUser(user) {
+  if (!user?.id) return
+  localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user))
+}
+
+function loadCachedUser() {
+  try {
+    const user = JSON.parse(localStorage.getItem(USER_CACHE_KEY))
+    return user?.id ? user : null
+  } catch {
+    return null
+  }
 }
 
 function loadRecipes() {
@@ -30,6 +46,23 @@ function loadRecipes() {
     console.warn('本地菜谱读取失败，将使用初始数据。', error)
   }
   return currentUser ? [] : starterRecipes
+}
+
+async function hydrateRecipesFromIndexedDB() {
+  try {
+    const cached = await readRecipeCache()
+    if (!Array.isArray(cached) || !cached.length) return false
+    const nextRecipes = cached.map(normalizeRecipe)
+    if (recipesChanged(nextRecipes)) {
+      recipes = nextRecipes
+      render()
+      hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(() => null)
+    }
+    return true
+  } catch (error) {
+    console.warn('IndexedDB 菜谱缓存读取失败。', error)
+    return false
+  }
 }
 
 function normalizeRecipe(recipe) {
@@ -227,6 +260,7 @@ function settingsMenuTemplate() {
   return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
     <button data-action="account-info">账号信息</button>
     ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
+    <button data-action="clear-local-cache">清除本地缓存</button>
     <button data-action="logout">退出登录</button>
     <button class="muted" data-action="close-settings">取消</button>
   </div>`
@@ -375,12 +409,15 @@ function uniqueId(prefix = 'id') { return `${prefix}-${Date.now()}-${Math.random
 function persistRecipes() {
   const serializable = serializeRecipes()
   localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
   saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
 }
 
 async function persistSingleRecipe(recipe) {
   await saveCloudRecipe(serializeRecipes([recipe])[0])
-  localStorage.setItem(userStorageKey(), JSON.stringify(serializeRecipes()))
+  const serializable = serializeRecipes()
+  localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
 }
 
 function serializeRecipes(list = recipes) {
@@ -460,14 +497,37 @@ function clearRecipeImage(recipe) {
 
 function openImageDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IMAGE_DB_NAME, 2)
+    const request = indexedDB.open(IMAGE_DB_NAME, 3)
     request.onupgradeneeded = () => {
       const database = request.result
       if (!database.objectStoreNames.contains(IMAGE_STORE)) database.createObjectStore(IMAGE_STORE)
       if (!database.objectStoreNames.contains(IMAGE_META_STORE)) database.createObjectStore(IMAGE_META_STORE)
+      if (!database.objectStoreNames.contains(RECIPE_META_STORE)) database.createObjectStore(RECIPE_META_STORE)
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
+  })
+}
+
+async function writeRecipeCache(serializableRecipes) {
+  const database = await openImageDatabase()
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(RECIPE_META_STORE, 'readwrite')
+    transaction.objectStore(RECIPE_META_STORE).put({
+      recipes: serializableRecipes,
+      savedAt: Date.now(),
+    }, userStorageKey())
+    transaction.oncomplete = () => { database.close(); resolve() }
+    transaction.onerror = () => { database.close(); reject(transaction.error) }
+  })
+}
+
+async function readRecipeCache() {
+  const database = await openImageDatabase()
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(RECIPE_META_STORE, 'readonly').objectStore(RECIPE_META_STORE).get(userStorageKey())
+    request.onsuccess = () => { database.close(); resolve(request.result?.recipes || null) }
+    request.onerror = () => { database.close(); reject(request.error) }
   })
 }
 
@@ -544,6 +604,31 @@ async function removeStoredImage(imageId, version = '') {
     transaction.oncomplete = () => { database.close(); resolve() }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
   })
+}
+
+async function clearIndexedDBCache() {
+  const database = await openImageDatabase()
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([IMAGE_STORE, IMAGE_META_STORE, RECIPE_META_STORE], 'readwrite')
+    transaction.objectStore(IMAGE_STORE).clear()
+    transaction.objectStore(IMAGE_META_STORE).clear()
+    transaction.objectStore(RECIPE_META_STORE).delete(userStorageKey())
+    transaction.oncomplete = () => { database.close(); resolve() }
+    transaction.onerror = () => { database.close(); reject(transaction.error) }
+  })
+}
+
+async function clearLocalCacheAndReload() {
+  localStorage.removeItem(userStorageKey())
+  for (const objectUrl of imageObjectUrls.values()) URL.revokeObjectURL(objectUrl)
+  imageObjectUrls.clear()
+  await Promise.allSettled([clearIndexedDBCache(), clearCloudImageResponseCache()])
+  recipes = []
+  render()
+  if (!cloudReady) cloudReady = await initCloud()
+  await syncCloudLibrary({ force: true })
+  await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(() => null)
+  preloadHomeImages().catch(() => null)
 }
 
 async function listImageMeta() {
@@ -690,27 +775,23 @@ async function syncCloudLibrary({ force = false } = {}) {
     if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
-    await Promise.all(syncedRecipes.map(async recipe => {
-      if (recipe.imageId) {
-        const localBlob = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
-        if (!cloudLibraryExists && localBlob) await uploadCloudImage(recipe.imageId, localBlob).catch(() => null)
-        if (localBlob) setRecipeImageFromBlob(recipe, localBlob)
-      }
-      await Promise.all((recipe.cookRecords || []).map(async record => {
-        if (!record.imageId) return
-        const localBlob = await readImage(record.imageId, record.imageVersion).catch(() => null)
-        if (localBlob) setRecordImageFromBlob(record, localBlob)
-      }))
-    }))
+    const currentRecipeImages = new Map(recipes.map(recipe => [String(recipe.id), { imageId: recipe.imageId, imageVersion: recipe.imageVersion, image: recipe.image }]))
+    syncedRecipes.forEach(recipe => {
+      const currentImage = currentRecipeImages.get(String(recipe.id))
+      if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
+    })
     const shouldRender = force || recipesChanged(syncedRecipes)
     recipes = syncedRecipes
     const serializable = serializeRecipes()
     localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+    writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
     if (!cloudLibraryExists) await saveCloudLibrary(serializable)
     if (shouldRender) render()
+    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
     preloadHomeImages().catch(error => console.warn('首页图片预加载失败。', error))
   } catch (error) {
     console.warn('云端菜谱读取失败，继续使用本机数据。', error)
+    if (!navigator.onLine) window.alert('当前离线，已显示本地缓存。联网后会自动同步。')
   }
 }
 
@@ -1410,12 +1491,13 @@ async function startApplication() {
   viewingMember = null
   settingsMenuOpen = false
   recipes = loadRecipes()
-  await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), false)
-  if (isAdmin()) await loadMembers()
   render()
-  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
-  await bootstrapCloudSync()
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败。', error))
+  hydrateRecipesFromIndexedDB().catch(() => null)
+  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
+  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
+  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
+  bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
 }
 
 window.addEventListener('popstate', event => {
@@ -1431,16 +1513,32 @@ window.addEventListener('popstate', event => {
 })
 
 async function checkAccess() {
-  root.innerHTML = authLoadingTemplate()
+  const cachedUser = loadCachedUser()
+  if (cachedUser) {
+    currentUser = cachedUser
+    startApplication()
+  } else {
+    root.innerHTML = authLoadingTemplate()
+  }
   try {
     const response = await fetch('/api/auth', { cache: 'no-store', credentials: 'same-origin' })
     const result = await response.json()
     if (response.ok && result.authenticated) {
       currentUser = result.user
+      saveCachedUser(currentUser)
       return startApplication()
+    }
+    if (cachedUser && response.ok && !result.authenticated) {
+      localStorage.removeItem(USER_CACHE_KEY)
+      appStarted = false
+      currentUser = null
+      recipes = []
     }
     root.innerHTML = authTemplate(response.status === 503 ? result.error : '')
   } catch {
+    if (cachedUser) {
+      return
+    }
     root.innerHTML = authTemplate('暂时无法验证访问，请检查网络后重试')
   }
 }
@@ -1478,6 +1576,7 @@ root.addEventListener('submit', async event => {
     authBusy = false
     if (response.ok) {
       currentUser = result.user
+      saveCachedUser(currentUser)
       return startApplication()
     }
     root.innerHTML = authTemplate(result.error || '登录失败')
@@ -1668,9 +1767,22 @@ root.addEventListener('click', async event => {
     render()
     return
   }
+  if (action === 'clear-local-cache') {
+    settingsMenuOpen = false
+    if (!window.confirm('确定清除本地缓存吗？登录状态会保留，菜谱和图片会重新从服务器读取。')) { render(); return }
+    try {
+      await clearLocalCacheAndReload()
+      window.alert('本地缓存已清除，并已重新同步服务器数据。')
+    } catch (error) {
+      window.alert('清除缓存失败，请稍后重试。')
+      render()
+    }
+    return
+  }
   if (action === 'create-member') { createMember(); return }
   if (action === 'logout') {
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
+      localStorage.removeItem(USER_CACHE_KEY)
       appStarted = false
       selectedId = null
       currentUser = null
