@@ -20,6 +20,7 @@ const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
 const APP_VERSION = 'v1.0.8'
+const THEME_KEY = 'zanjia-theme'
 
 function userStorageKey() {
   return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
@@ -37,6 +38,17 @@ function loadCachedUser() {
   } catch {
     return null
   }
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = themeMode
+}
+
+function toggleTheme() {
+  themeMode = themeMode === 'dark' ? 'light' : 'dark'
+  localStorage.setItem(THEME_KEY, themeMode)
+  applyTheme()
+  render()
 }
 
 function loadRecipes() {
@@ -109,6 +121,7 @@ let currentUser = null
 let familyMemberCount = 0
 let viewingMember = null
 let settingsMenuOpen = false
+let themeMode = localStorage.getItem(THEME_KEY) || 'light'
 const imageObjectUrls = new Map()
 const imageRetrying = new Set()
 
@@ -258,28 +271,29 @@ function scopeTitle() {
 
 function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
-  const currentUrl = window.location.origin
+  const selectedRecipe = findRecipeById(selectedId)
   return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
+    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
     <button data-action="account-info">账号信息</button>
     ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
     <div class="app-info-panel">
-      <div class="app-info-title">应用信息</div>
-      <div class="app-info-row">
-        <span>当前网址</span>
-        <strong>${escapeHtml(currentUrl)}</strong>
-      </div>
-      <div class="app-info-actions">
-        <button data-action="copy-app-url">复制网址</button>
-        <button data-action="share-app-url">分享网址</button>
-      </div>
       <div class="app-info-row compact">
-        <span>当前版本</span>
+        <span>版本</span>
         <strong>${APP_VERSION}</strong>
       </div>
     </div>
     <button data-action="clear-local-cache">清除本地缓存</button>
     <button data-action="logout">退出登录</button>
     <button class="muted" data-action="close-settings">取消</button>
+  </div>`
+}
+
+function globalActionsTemplate() {
+  return `<div class="global-actions" aria-label="全局操作">
+    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
+    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
+    <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
   </div>`
 }
 
@@ -290,16 +304,15 @@ function statsTemplate() {
   return `<div class="home-stats">
     <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
     <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
-    ${isAdmin() ? `<button type="button" data-action="members"><strong>${stats.members}</strong><span>家庭成员</span></button>` : `<span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>`}
+    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
   </div>`
 }
 
 function homeTemplate() {
   return `<div class="app-shell home-shell">
-    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions"><div class="recipe-count"><strong>${getFilteredRecipes().length}</strong><span>道家常味</span></div></div></div>
+    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
       <div class="home-action-row">
-        ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : `<button class="top-add-button" data-action="new-recipe">${icons.plus}<span>新增</span></button>`}
-        <button class="settings-button" data-action="settings">设置</button>
+        ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
       ${statsTemplate()}
@@ -310,7 +323,8 @@ function homeTemplate() {
 }
 
 function membersTemplate() {
-  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">家庭成员</div><span class="header-spacer"></span></header>
+  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">家庭成员</div>${globalActionsTemplate()}</header>
+    ${settingsMenuTemplate()}
     <main class="recipe-form">
       <section class="form-section">
         <div class="form-label"><strong>新增成员账号</strong><span>仅管理员可创建</span></div>
@@ -343,7 +357,8 @@ function section(number, title, body) {
 
 function detailTemplate(recipe) {
   const editable = canEditRecipe(recipe)
-  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${canEditRecipe(recipe) ? '<button class="header-edit" data-action="edit-recipe">编辑菜谱</button>' : '<span class="header-spacer"></span>'}</header>
+  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
+    ${settingsMenuTemplate()}
     <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
       <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
       <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
@@ -363,7 +378,8 @@ function detailTemplate(recipe) {
 
 function newRecipeTemplate() {
   const isEditing = page === 'edit'
-  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="cancel-form" aria-label="取消${isEditing ? '编辑' : '新增'}">${icons.back}</button><div class="detail-header-title">${isEditing ? '编辑菜谱' : '新增菜谱'}</div><button class="header-save" data-action="save-recipe">保存</button></header>
+  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="cancel-form" aria-label="取消${isEditing ? '编辑' : '新增'}">${icons.back}</button><div class="detail-header-title">${isEditing ? '编辑菜谱' : '新增菜谱'}</div>${globalActionsTemplate()}</header>
+    ${settingsMenuTemplate()}
     <main class="recipe-form">
       <section class="form-section photo-section"><div class="form-label"><strong>成品照片</strong><span>可选</span></div>
         ${draft.image ? `<button class="form-photo has-image" data-action="choose-draft-image"><img src="${draft.image}" alt="待保存的菜谱图片"><span>更换图片</span></button><button class="remove-form-photo" data-action="remove-draft-image">删除图片</button>` : `<button class="form-photo placeholder" data-action="choose-draft-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>建议使用横向 4:3 照片</small></button>`}
@@ -1795,24 +1811,8 @@ root.addEventListener('click', async event => {
   if (action === 'save-cook-record') { saveCookRecord(); return }
   if (action === 'choose-cook-image') { document.getElementById('cook-file-input')?.click(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
-  if (action === 'settings') { settingsMenuOpen = !settingsMenuOpen; render(); return }
-  if (action === 'close-settings') { settingsMenuOpen = false; render(); return }
-  if (action === 'account-info') {
-    window.alert(`当前账号：${currentAccountName()}${currentUser?.loginCode ? `\n账号编号：${currentUser.loginCode}` : ''}`)
-    settingsMenuOpen = false
-    render()
-    return
-  }
-  if (action === 'copy-app-url') {
-    try {
-      await copyCurrentUrl()
-      window.alert('网址已复制')
-    } catch (error) {
-      window.alert(`当前网址：${window.location.origin}`)
-    }
-    return
-  }
-  if (action === 'share-app-url') {
+  if (action === 'toggle-theme') { toggleTheme(); return }
+  if (action === 'share-url') {
     try {
       const result = await shareCurrentUrl()
       if (result === 'copied') window.alert('网址已复制')
@@ -1821,9 +1821,17 @@ root.addEventListener('click', async event => {
         await copyCurrentUrl()
         window.alert('网址已复制')
       } catch {
-        window.alert(`当前网址：${window.location.origin}`)
+        window.alert('网址已复制失败')
       }
     }
+    return
+  }
+  if (action === 'settings') { settingsMenuOpen = !settingsMenuOpen; render(); return }
+  if (action === 'close-settings') { settingsMenuOpen = false; render(); return }
+  if (action === 'account-info') {
+    window.alert(`当前账号：${currentAccountName()}${currentUser?.loginCode ? `\n账号编号：${currentUser.loginCode}` : ''}`)
+    settingsMenuOpen = false
+    render()
     return
   }
   if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = '全部'; query = ''; render(); return }
@@ -1929,4 +1937,5 @@ root.addEventListener('click', async event => {
   if (action === 'close-preview') { imagePreview = false; render() }
 })
 
+applyTheme()
 checkAccess()

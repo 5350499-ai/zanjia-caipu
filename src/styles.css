@@ -19,6 +19,21 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .brand-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-bottom: 15px; }
 .brand-row h1 { margin: 3px 0 0; font-family: Georgia, "Songti SC", serif; font-size: 28px; letter-spacing: .02em; }
 .header-actions { display: flex; align-items: center; gap: 9px; }
+.global-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.global-icon-button {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #ded7cd;
+  border-radius: 11px;
+  color: #4b4138;
+  background: rgba(255, 253, 248, .94);
+  box-shadow: 0 2px 9px rgba(45, 36, 27, .04);
+  font-size: 18px;
+  line-height: 1;
+}
+.global-icon-button:active { transform: scale(.96); background: #f2ede6; }
 .recipe-count { display: flex; align-items: baseline; gap: 5px; color: #766d61; font-size: 12px; }
 .recipe-count strong { color: #9c3d2d; font-family: Georgia, serif; font-size: 22px; }
 .top-add-button { height: 34px; padding: 0 10px; display: flex; align-items: center; gap: 2px; border: 1px solid #9c3d2d; border-radius: 4px; color: #9c3d2d; background: transparent; font-size: 14px; font-weight: 800; white-space: nowrap; }
@@ -274,6 +289,38 @@ textarea.form-control.tall { min-height: 130px; }
 :root { color: #25221e; background: #e8e6e1; }
 body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 .app-shell { background: #f8f7f3; }
+
+:root[data-theme="dark"] { color: #f2eee6; background: #171411; }
+:root[data-theme="dark"] body { background: #171411; color: #f2eee6; }
+:root[data-theme="dark"] .app-shell,
+:root[data-theme="dark"] .home-header,
+:root[data-theme="dark"] .detail-header,
+:root[data-theme="dark"] .form-bottom-actions { background: rgba(31, 27, 23, .96); border-color: #3d352e; color: #f2eee6; }
+:root[data-theme="dark"] .settings-popover,
+:root[data-theme="dark"] .recipe-card,
+:root[data-theme="dark"] .form-section,
+:root[data-theme="dark"] .detail-accordion,
+:root[data-theme="dark"] .cook-record,
+:root[data-theme="dark"] .search-box,
+:root[data-theme="dark"] .app-info-panel { background: #29241f; border-color: #40372f; color: #f2eee6; }
+:root[data-theme="dark"] .global-icon-button,
+:root[data-theme="dark"] .settings-button,
+:root[data-theme="dark"] .secondary-mini-button,
+:root[data-theme="dark"] .settings-popover button { background: #332d27; border-color: #4a4037; color: #f2eee6; }
+:root[data-theme="dark"] .account-subtitle,
+:root[data-theme="dark"] .recipe-count,
+:root[data-theme="dark"] .app-info-row span,
+:root[data-theme="dark"] .body-copy,
+:root[data-theme="dark"] .recipe-author-line { color: #c8bdb1; }
+:root[data-theme="dark"] .card-content h3,
+:root[data-theme="dark"] .list-heading h2,
+:root[data-theme="dark"] .detail-title-row h1,
+:root[data-theme="dark"] .app-info-row strong { color: #fff8ef; }
+:root[data-theme="dark"] .category-nav { background: #211d19; border-color: #3b332c; }
+:root[data-theme="dark"] .category-nav button { color: #d4c8bb; }
+:root[data-theme="dark"] .category-nav button.active { color: #ffd7c8; background: #332a24; }
+:root[data-theme="dark"] .image-area.placeholder,
+:root[data-theme="dark"] .form-photo.placeholder { background: #302b26; color: #c8bdb1; }
 .home-header { padding: max(14px, env(safe-area-inset-top)) 14px 12px; background: rgba(248, 247, 243, .96); border-color: #e8e4dc; }
 .brand-row { margin-bottom: 12px; }
 .brand-row h1 { font-size: 27px; letter-spacing: -.02em; }
@@ -507,7 +554,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 }
 
 .settings-popover {
-  position: absolute;
+  position: fixed;
   z-index: 15;
   top: calc(max(10px, env(safe-area-inset-top)) + 78px);
   right: 14px;
@@ -533,6 +580,9 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
   font-size: 15px;
   font-weight: 750;
 }
+
+.detail-header .global-actions { flex: 0 0 auto; }
+.detail-header-title { min-width: 0; flex: 1; text-align: center; }
 
 .settings-popover button:active {
   background: #f2ede6;
