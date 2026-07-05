@@ -19,6 +19,7 @@ const RECIPE_META_STORE = 'recipe-meta'
 const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
+const APP_VERSION = 'v1.0.8'
 
 function userStorageKey() {
   return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
@@ -257,9 +258,25 @@ function scopeTitle() {
 
 function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
+  const currentUrl = window.location.origin
   return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
     <button data-action="account-info">账号信息</button>
     ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
+    <div class="app-info-panel">
+      <div class="app-info-title">应用信息</div>
+      <div class="app-info-row">
+        <span>当前网址</span>
+        <strong>${escapeHtml(currentUrl)}</strong>
+      </div>
+      <div class="app-info-actions">
+        <button data-action="copy-app-url">复制网址</button>
+        <button data-action="share-app-url">分享网址</button>
+      </div>
+      <div class="app-info-row compact">
+        <span>当前版本</span>
+        <strong>${APP_VERSION}</strong>
+      </div>
+    </div>
     <button data-action="clear-local-cache">清除本地缓存</button>
     <button data-action="logout">退出登录</button>
     <button class="muted" data-action="close-settings">取消</button>
@@ -405,6 +422,38 @@ function cookRecordsSection(recipe) {
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
 function splitLines(text) { return text.split('\n').map(item => item.trim()).filter(Boolean) }
 function uniqueId(prefix = 'id') { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` }
+
+async function copyCurrentUrl() {
+  const url = window.location.origin
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(url)
+    return true
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = url
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const ok = document.execCommand('copy')
+  textarea.remove()
+  return ok
+}
+
+async function shareCurrentUrl() {
+  const url = window.location.origin
+  if (navigator.share) {
+    await navigator.share({
+      title: '咱家菜谱',
+      text: '咱家菜谱',
+      url,
+    })
+    return 'shared'
+  }
+  await copyCurrentUrl()
+  return 'copied'
+}
 
 function persistRecipes() {
   const serializable = serializeRecipes()
@@ -1752,6 +1801,29 @@ root.addEventListener('click', async event => {
     window.alert(`当前账号：${currentAccountName()}${currentUser?.loginCode ? `\n账号编号：${currentUser.loginCode}` : ''}`)
     settingsMenuOpen = false
     render()
+    return
+  }
+  if (action === 'copy-app-url') {
+    try {
+      await copyCurrentUrl()
+      window.alert('网址已复制')
+    } catch (error) {
+      window.alert(`当前网址：${window.location.origin}`)
+    }
+    return
+  }
+  if (action === 'share-app-url') {
+    try {
+      const result = await shareCurrentUrl()
+      if (result === 'copied') window.alert('网址已复制')
+    } catch (error) {
+      try {
+        await copyCurrentUrl()
+        window.alert('网址已复制')
+      } catch {
+        window.alert(`当前网址：${window.location.origin}`)
+      }
+    }
     return
   }
   if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = '全部'; query = ''; render(); return }

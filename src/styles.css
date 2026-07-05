@@ -511,7 +511,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
   z-index: 15;
   top: calc(max(10px, env(safe-area-inset-top)) + 78px);
   right: 14px;
-  width: min(210px, calc(100vw - 28px));
+  width: min(330px, calc(100vw - 28px));
   padding: 8px;
   display: grid;
   gap: 4px;
@@ -540,6 +540,63 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 
 .settings-popover .muted {
   color: #8a8177;
+}
+
+.app-info-panel {
+  margin: 4px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f6f1ea;
+  border: 1px solid #ebe4da;
+}
+
+.app-info-title {
+  margin-bottom: 9px;
+  color: #9a4639;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.app-info-row {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.app-info-row.compact {
+  margin: 10px 0 0;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.app-info-row span {
+  color: #85796e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.app-info-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #2f2923;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.app-info-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.settings-popover .app-info-actions button {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+  color: #924033;
+  font-size: 14px;
 }
 
 .eyebrow {
