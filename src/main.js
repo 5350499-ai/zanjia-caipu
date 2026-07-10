@@ -19,7 +19,7 @@ const RECIPE_META_STORE = 'recipe-meta'
 const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
-const APP_VERSION = 'v1.0.9'
+const APP_VERSION = 'v1.0.10'
 const THEME_KEY = 'zanjia-theme'
 
 function userStorageKey() {
@@ -1557,7 +1557,7 @@ async function startApplication() {
   settingsMenuOpen = false
   recipes = loadRecipes()
   render()
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败。', error))
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
   hydrateRecipesFromIndexedDB().catch(() => null)
   hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
   hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
