@@ -1,14 +1,14 @@
 import { cleanupCloudImages, clearCloudImageResponseCache, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 
-const categories = ['ȫ��', '�Ȳ�', '����', '����', '��ʳ', '����', '��Ʒ', '���', '�ز�']
+const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
 
 const starterRecipes = [
-  { id: 1, name: '�㳦������˿���', categories: ['�Ȳ�', '���'], ingredients: ['�㳦 1��', '������ 1��', '�����˿ 1��', '�ײ� 4Ƭ'], seasonings: ['���� 2��', '��� 1��', '�� 3��', '�� ����'], steps: ['��˿��ǰ����ˮ����������п顣', '�㳦�Գ��ͣ�����ĩ�Ͱײ˳����', '���붹������˿��һС��ˮ����ζ����8���ӡ�'], tips: '��˿��ˮ����֭��Ҫ�յ�̫�ɡ�����ǰ��һ���ٷ��Ρ�', notes: [{ id: 'note-1', date: '2026-06-20', text: '���ˮ�Ŷ���' }, { id: 'note-2', date: '2026-07-03', text: '�������ó�' }], image: null },
-  { id: 2, name: '������������', categories: ['�Ȳ�', '�ز�'], ingredients: ['������ 2��', '���� 3��', 'С�� 1��'], seasonings: ['�� ����', '���� ����'], steps: ['�����������δ�ɢ������ʢ����', '������������֭�����Ǻ��Ρ�', '���ؼ������ȣ����л���'], tips: '������ѡ��һЩ�ģ������׳���֭��', notes: [{ id: 'note-3', date: '2026-05-12', text: '�ǷŰ��׸պ�' }], image: null },
-  { id: 3, name: '��ź�Ź���', categories: ['����', '���'], ingredients: ['�Ź� 500��', '��ź 2��', '�� 4Ƭ'], seasonings: ['�� ����', '�׺��� ����'], steps: ['�Ź���ˮ�¹���ˮ��ϴ����', '��ź�й����飬���Źǡ���Ƭһ�������', '��������ˮ��С����90���Ӻ���Ρ�'], tips: '�����ţ������ʡ�', notes: [], image: null },
-  { id: 4, name: '����ƹ�', categories: ['����', '�ز�'], ingredients: ['�ƹ� 2��', '������ 1С��'], seasonings: ['�� 4��', '��� 2��', '���� 1��', '���� ����'], steps: ['�ƹ������жΡ�', '��ĩ����ϰ��ȡ�', '����ƹϺͻ����װ��ȡ�'], tips: '�ְ��ֳԣ��ž��˻��ˮ��', notes: [], image: null },
-  { id: 5, name: 'С���Ϲ���', categories: ['����', '��ʳ'], ingredients: ['С�� 80��', '�Ϲ� 200��'], seasonings: ['��ˮ 900����'], steps: ['С����ϴһ�Σ��Ϲ���С�顣', 'ˮ������С�׺��Ϲϡ�', 'С����30���ӣ���;�������Ρ�'], tips: 'С�ײ�Ҫ������ϴ��������ʧ��ζ��', notes: [], image: null },
+  { id: 1, name: '香肠豆腐粉丝烩菜', categories: ['热菜', '肉菜'], ingredients: ['香肠 1根', '北豆腐 1块', '红薯粉丝 1把', '白菜 4片'], seasonings: ['生抽 2勺', '蚝油 1勺', '蒜 3瓣', '盐 少许'], steps: ['粉丝提前用温水泡软，豆腐切块。', '香肠煸出油，放蒜末和白菜炒软。', '加入豆腐、粉丝和一小碗水，调味后炖8分钟。'], tips: '粉丝吸水，汤汁不要收得太干。出锅前尝一下再放盐。', notes: [{ id: 'note-1', date: '2026-06-20', text: '这次水放多了' }, { id: 'note-2', date: '2026-07-03', text: '多放蒜更好吃' }], image: null },
+  { id: 2, name: '西红柿炒鸡蛋', categories: ['热菜', '素菜'], ingredients: ['西红柿 2个', '鸡蛋 3个', '小葱 1根'], seasonings: ['盐 适量', '白糖 半勺'], steps: ['鸡蛋加少许盐打散，炒熟盛出。', '西红柿炒出汤汁，放糖和盐。', '倒回鸡蛋翻匀，撒葱花。'], tips: '西红柿选熟一些的，更容易炒出汁。', notes: [{ id: 'note-3', date: '2026-05-12', text: '糖放半勺刚好' }], image: null },
+  { id: 3, name: '莲藕排骨汤', categories: ['汤类', '肉菜'], ingredients: ['排骨 500克', '莲藕 2节', '姜 4片'], seasonings: ['盐 适量', '白胡椒 少许'], steps: ['排骨冷水下锅焯水后洗净。', '莲藕切滚刀块，与排骨、姜片一起入锅。', '加足量热水，小火炖90分钟后放盐。'], tips: '盐最后放，汤更鲜。', notes: [], image: null },
+  { id: 4, name: '凉拌黄瓜', categories: ['凉菜', '素菜'], ingredients: ['黄瓜 2根', '花生米 1小把'], seasonings: ['蒜 4瓣', '香醋 2勺', '生抽 1勺', '香油 少许'], steps: ['黄瓜拍松切段。', '蒜末与调料拌匀。', '加入黄瓜和花生米拌匀。'], tips: '现拌现吃，放久了会出水。', notes: [], image: null },
+  { id: 5, name: '小米南瓜粥', categories: ['粥类', '主食'], ingredients: ['小米 80克', '南瓜 200克'], seasonings: ['清水 900毫升'], steps: ['小米淘洗一次，南瓜切小块。', '水开后下小米和南瓜。', '小火煮30分钟，中途搅动两次。'], tips: '小米不要反复搓洗，以免流失香味。', notes: [], image: null },
 ]
 
 const STORAGE_KEY = 'family-recipes-v1'
@@ -56,7 +56,7 @@ function loadRecipes() {
     const saved = JSON.parse(localStorage.getItem(userStorageKey()))
     if (Array.isArray(saved)) return saved.map(normalizeRecipe)
   } catch (error) {
-    console.warn('���ز��׶�ȡʧ�ܣ���ʹ�ó�ʼ���ݡ�', error)
+    console.warn('本地菜谱读取失败，将使用初始数据。', error)
   }
   return currentUser ? [] : starterRecipes
 }
@@ -73,7 +73,7 @@ async function hydrateRecipesFromIndexedDB() {
     }
     return true
   } catch (error) {
-    console.warn('IndexedDB ���׻����ȡʧ�ܡ�', error)
+    console.warn('IndexedDB 菜谱缓存读取失败。', error)
     return false
   }
 }
@@ -95,7 +95,7 @@ function normalizeRecipe(recipe) {
 
 let recipes = []
 
-let activeCategory = 'ȫ��'
+let activeCategory = '全部'
 let activeScope = 'mine'
 let query = ''
 let selectedId = null
@@ -137,18 +137,18 @@ const icons = {
 function imageArea(recipe, compact = false) {
   if (compact) {
     if (recipe.image) return `<div class="image-area has-image compact"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></div>`
-    return `<div class="image-area placeholder compact"><span class="placeholder-plus" aria-hidden="true">+</span><strong>���ͼƬ</strong></div>`
+    return `<div class="image-area placeholder compact"><span class="placeholder-plus" aria-hidden="true">+</span><strong>添加图片</strong></div>`
   }
   if (recipe.image) return `<button class="image-area has-image" data-action="view-image"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></button>`
-  if (page === 'detail' && !canEditRecipe(recipe)) return `<div class="image-area placeholder"><span class="placeholder-plus" aria-hidden="true">+</span><strong>����ͼƬ</strong></div>`
-  return `<button class="image-area placeholder" data-action="add-image"><span class="camera-ring">${icons.add}</span><strong>�����ͼ</strong><small>�ϴ�����˵ĳ�Ʒ��Ƭ</small></button>`
+  if (page === 'detail' && !canEditRecipe(recipe)) return `<div class="image-area placeholder"><span class="placeholder-plus" aria-hidden="true">+</span><strong>暂无图片</strong></div>`
+  return `<button class="image-area placeholder" data-action="add-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>上传这道菜的成品照片</small></button>`
 }
 
 function getFilteredRecipes() {
   const keyword = query.trim().toLowerCase()
   return recipes.filter(recipe => {
     const scopeMatch = matchScope(recipe)
-    const categoryMatch = activeCategory === 'ȫ��' || recipe.categories.includes(activeCategory)
+    const categoryMatch = activeCategory === '全部' || recipe.categories.includes(activeCategory)
     const searchableText = [
       recipe.name,
       ...(recipe.ingredients || []),
@@ -209,12 +209,12 @@ function homeStats() {
 }
 
 function currentAccountName() {
-  return currentUser?.displayName || (isAdmin() ? '����Ա' : '��')
+  return currentUser?.displayName || (isAdmin() ? '管理员' : '我')
 }
 
 function homeSubtitle() {
-  if (viewingMember) return `���ڲ鿴��${viewingMember.displayName}�Ĳ���`
-  return `${currentAccountName()}�Ĳ���`
+  if (viewingMember) return `正在查看：${viewingMember.displayName}的菜谱`
+  return `${currentAccountName()}的菜谱`
 }
 
 function relativeDate(dateText) {
@@ -222,68 +222,107 @@ function relativeDate(dateText) {
   const today = new Date()
   const date = new Date(dateText)
   const diff = Math.round((new Date(today.toDateString()) - new Date(date.toDateString())) / 86400000)
-  if (diff === 0) return '����'
-  if (diff === 1) return '����'
-  if (diff > 1) return `${diff}��ǰ`
+  if (diff === 0) return '今天'
+  if (diff === 1) return '昨天'
+  if (diff > 1) return `${diff}天前`
   return dateText.slice(0, 10)
 }
 
 function authTemplate(message = '') {
   return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
-    <form id="auth-form" class="login-form">
-      <h2>账号登录</h2>
-      <label for="auth-account">账号 / 邮箱</label>
-      <input id="auth-account" name="account" autocomplete="username" placeholder="成员账号 001，或管理员邮箱" autofocus>
-      <label for="auth-password">密码 / PIN</label>
-      <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码">
+    <form id="member-login-form" class="login-form">
+      <h2>家庭成员登录</h2>
+      <label for="member-code">账号编号</label>
+      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
+      <label for="member-pin">PIN / 密码</label>
+      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
       <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
     </form>
-    <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
+    <details class="admin-login-panel">
+      <summary>管理员邮箱登录</summary>
+      <form id="admin-login-form" class="login-form">
+        <label for="admin-email">邮箱</label>
+        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
+        <label for="admin-password">密码</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
+        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
+      </form>
+    </details>
     <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
+
 function authLoadingTemplate() {
-  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">��</div><p>���ڴ��ۼҲ��ס�</p></section></main>`
+  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p>正在打开咱家菜谱…</p></section></main>`
+}
+
+function startupFailureTemplate(message = '咱家菜谱加载失败，请点击重新加载最新版本') {
+  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p class="startup-failure-title">咱家菜谱加载失败</p><p class="startup-failure-message">${escapeHtml(message)}</p><button class="primary-button" type="button" data-action="reload-app">重新加载最新版本</button></section></main>`
+}
+
+async function clearStartupShellCache() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registrations.map(registration => registration.unregister()))
+    }
+    if (typeof caches !== 'undefined') {
+      const cacheKeys = await caches.keys()
+      await Promise.all(cacheKeys.filter(key => !key.startsWith('family-recipes-image-responses')).map(key => caches.delete(key)))
+    }
+  } catch (error) {
+    console.warn('启动缓存清理失败。', error)
+  }
+}
+
+async function reloadLatestVersion() {
+  await clearStartupShellCache()
+  window.location.reload()
+}
+
+function showStartupFailure(error) {
+  console.error('应用启动失败。', error)
+  root.innerHTML = startupFailureTemplate()
 }
 
 function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
-  return `<div class="list-heading"><h2>${query ? `��${escapeHtml(query)}��` : scopeTitle()}</h2><span>${filtered.length} ��</span></div><div class="recipe-list">
+  return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : scopeTitle()}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
     ${filtered.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
-    ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>û���ҵ���ز���</h3><p>�����������������</p></div>`}</div>`
+    ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>没有找到相关菜谱</h3><p>换个菜名或材料试试</p></div>`}</div>`
 }
 
 function scopeTitle() {
-  if (viewingMember) return `${viewingMember.displayName}�Ĳ���`
-  if (activeScope === 'mine') return '�ҵĲ���'
-  if (activeScope === 'shared') return '��ͥ����'
-  return '�ҵĲ���'
+  if (viewingMember) return `${viewingMember.displayName}的菜谱`
+  if (activeScope === 'mine') return '我的菜谱'
+  if (activeScope === 'shared') return '家庭共享'
+  return '我的菜谱'
 }
 
 function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
   const selectedRecipe = findRecipeById(selectedId)
-  return `<div class="settings-popover" role="dialog" aria-label="���ò˵�">
-    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">��������</button>'}
-    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">�༭����</button>' : ''}
-    <button data-action="account-info">�˺���Ϣ</button>
-    ${isAdmin() ? '<button data-action="members">��Ա����</button><button data-action="cleanup-images">����ͼƬ����</button>' : ''}
+  return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
+    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
+    <button data-action="account-info">账号信息</button>
+    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
     <div class="app-info-panel">
       <div class="app-info-row compact">
-        <span>�汾</span>
+        <span>版本</span>
         <strong>${APP_VERSION}</strong>
       </div>
     </div>
-    <button data-action="clear-local-cache">������ػ���</button>
-    <button data-action="logout">�˳���¼</button>
-    <button class="muted" data-action="close-settings">ȡ��</button>
+    <button data-action="clear-local-cache">清除本地缓存</button>
+    <button data-action="logout">退出登录</button>
+    <button class="muted" data-action="close-settings">取消</button>
   </div>`
 }
 
 function globalActionsTemplate() {
-  return `<div class="global-actions" aria-label="ȫ�ֲ���">
-    <button class="global-icon-button" data-action="toggle-theme" aria-label="�л�����">${themeMode === 'dark' ? '??' : '??'}</button>
-    <button class="global-icon-button" data-action="share-url" aria-label="������ַ">??</button>
-    <button class="global-icon-button" data-action="settings" aria-label="�˵�">?</button>
+  return `<div class="global-actions" aria-label="全局操作">
+    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
+    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
+    <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
   </div>`
 }
 
@@ -292,51 +331,51 @@ function statsTemplate() {
   const mineActive = !viewingMember && activeScope === 'mine'
   const sharedActive = !viewingMember && activeScope === 'shared'
   return `<div class="home-stats">
-    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>�ҵĲ���</span></button>
-    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>��ͥ����</span></button>
-    <span class="stat-card disabled"><strong>${stats.members}</strong><span>��ͥ��Ա</span></span>
+    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
+    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
   </div>`
 }
 
 function homeTemplate() {
   return `<div class="app-shell home-shell">
-    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>�ۼҲ���</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
+    <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
       <div class="home-action-row">
-        ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">�����ҵ���ҳ</button>' : ''}
+        ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
       ${statsTemplate()}
-      <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="�Ѳ��������" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="�������">${icons.close}</button></label>
-      <nav class="category-nav" aria-label="���׷���">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
-    <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '����ͬ�����²��ס�' : '����ˢ��'}</div>${recipePanelTemplate()}</main></div>
+      <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
+      <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
+    <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
 }
 
 function membersTemplate() {
-  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="����">${icons.back}</button><div class="detail-header-title">��ͥ��Ա</div>${globalActionsTemplate()}</header>
+  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">家庭成员</div>${globalActionsTemplate()}</header>
     ${settingsMenuTemplate()}
     <main class="recipe-form">
       <section class="form-section">
-        <div class="form-label"><strong>������Ա�˺�</strong><span>������Ա�ɴ���</span></div>
-        <input class="form-control" id="member-login-code" placeholder="�˺ű�ţ����� 001" value="${escapeHtml(memberDraft.loginCode)}">
-        <input class="form-control member-field" id="member-display-name" placeholder="��ʾ���ƣ����� ����1" value="${escapeHtml(memberDraft.displayName)}">
-        <input class="form-control member-field" id="member-pin-new" type="password" placeholder="PIN / ���룬���� 4 λ" value="${escapeHtml(memberDraft.pin)}">
-        <button class="primary-button member-create-button" data-action="create-member">�����˺�</button>
+        <div class="form-label"><strong>新增成员账号</strong><span>仅管理员可创建</span></div>
+        <input class="form-control" id="member-login-code" placeholder="账号编号，例如 001" value="${escapeHtml(memberDraft.loginCode)}">
+        <input class="form-control member-field" id="member-display-name" placeholder="显示名称，例如 孩子1" value="${escapeHtml(memberDraft.displayName)}">
+        <input class="form-control member-field" id="member-pin-new" type="password" placeholder="PIN / 密码，至少 4 位" value="${escapeHtml(memberDraft.pin)}">
+        <button class="primary-button member-create-button" data-action="create-member">创建账号</button>
       </section>
       <section class="form-section">
-        <div class="form-label"><strong>���г�Ա</strong><span>${members.length} ���˺�</span></div>
+        <div class="form-label"><strong>已有成员</strong><span>${members.length} 个账号</span></div>
         <div class="member-list">${members.map(member => `<article class="member-card" data-member-view="${member.id}">
-          <div><strong>${escapeHtml(member.displayName)}</strong><span>${escapeHtml(member.loginCode)} �� ${member.role === 'admin' ? '����Ա' : '��Ա'} �� ${member.isActive ? '����' : '��ͣ��'}</span></div>
+          <div><strong>${escapeHtml(member.displayName)}</strong><span>${escapeHtml(member.loginCode)} · ${member.role === 'admin' ? '管理员' : '成员'} · ${member.isActive ? '正常' : '已停用'}</span></div>
           <div class="member-actions">
-            <button data-member-view="${member.id}">�鿴����</button>
+            <button data-member-view="${member.id}">查看菜谱</button>
             ${member.role === 'admin' ? '' : `
-            <button data-member-toggle="${member.id}">${member.isActive ? 'ͣ��' : '����'}</button>
-            <button data-member-pin="${member.id}">�� PIN</button>
-            <button data-member-rename="${member.id}">����</button>
-            <button class="danger-text" data-member-delete="${member.id}">ɾ��</button>
+            <button data-member-toggle="${member.id}">${member.isActive ? '停用' : '启用'}</button>
+            <button data-member-pin="${member.id}">改 PIN</button>
+            <button data-member-rename="${member.id}">改名</button>
+            <button class="danger-text" data-member-delete="${member.id}">删除</button>
             `}
           </div>
-        </article>`).join('') || '<p class="empty-copy">��û�м�ͥ��Ա�˺š�</p>'}</div>
+        </article>`).join('') || '<p class="empty-copy">还没有家庭成员账号。</p>'}</div>
       </section>
     </main></div>`
 }
@@ -347,20 +386,20 @@ function section(number, title, body) {
 
 function detailTemplate(recipe) {
   const editable = canEditRecipe(recipe)
-  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="����">${icons.back}</button><div class="detail-header-title">��������</div>${globalActionsTemplate()}</header>
+  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
     ${settingsMenuTemplate()}
-    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">�ۼҵ����ֲ�</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">?</div></div>
-      <div class="recipe-author-line">��¼�ˣ�${escapeHtml(recipe.authorName || '����')}${recipe.isFamilyShared ? ` �� �����ˣ�${escapeHtml(recipe.authorName || '����')}` : ''} �� ���� ${recipe.cookCount || 0} ��</div>
+    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
       <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
-        <div><strong>��ǰ״̬��${recipe.isFamilyShared ? '???????? ��ͥ����' : '?? ˽�˲���'}</strong><small>${recipe.isFamilyShared ? '���м�ͥ��Ա�����ڡ���ͥ������￴����' : 'ֻ�д����ߺ͹���Ա���Կ�����'}</small></div>
-        <label class="share-switch ${editable ? '' : 'disabled'}"><span>�������ͥ</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
+        <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能在「家庭共享」里看到。' : '只有创建者和管理员可以看到。'}</small></div>
+        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
       </div>
-      <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '�� ���ղ�' : '�� �ղ�'}</button><button data-action="copy-recipe">���Ʋ���</button></div>
+      <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
-      ${section('01', '����', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('02', '����', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('03', '��������', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
-      ${section('04', 'ע������', `<p class="body-copy">${escapeHtml(recipe.tips || '����')}</p>`)}
+      ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
+      ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
       ${notesSection(recipe)}
       ${cookRecordsSection(recipe)}
     </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
@@ -368,61 +407,61 @@ function detailTemplate(recipe) {
 
 function newRecipeTemplate() {
   const isEditing = page === 'edit'
-  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="cancel-form" aria-label="ȡ��${isEditing ? '�༭' : '����'}">${icons.back}</button><div class="detail-header-title">${isEditing ? '�༭����' : '��������'}</div>${globalActionsTemplate()}</header>
+  return `<div class="app-shell form-shell"><header class="detail-header"><button class="icon-button" data-action="cancel-form" aria-label="取消${isEditing ? '编辑' : '新增'}">${icons.back}</button><div class="detail-header-title">${isEditing ? '编辑菜谱' : '新增菜谱'}</div>${globalActionsTemplate()}</header>
     ${settingsMenuTemplate()}
     <main class="recipe-form">
-      <section class="form-section photo-section"><div class="form-label"><strong>��Ʒ��Ƭ</strong><span>��ѡ</span></div>
-        ${draft.image ? `<button class="form-photo has-image" data-action="choose-draft-image"><img src="${draft.image}" alt="������Ĳ���ͼƬ"><span>����ͼƬ</span></button><button class="remove-form-photo" data-action="remove-draft-image">ɾ��ͼƬ</button>` : `<button class="form-photo placeholder" data-action="choose-draft-image"><span class="camera-ring">${icons.add}</span><strong>�����ͼ</strong><small>����ʹ�ú��� 4:3 ��Ƭ</small></button>`}
+      <section class="form-section photo-section"><div class="form-label"><strong>成品照片</strong><span>可选</span></div>
+        ${draft.image ? `<button class="form-photo has-image" data-action="choose-draft-image"><img src="${draft.image}" alt="待保存的菜谱图片"><span>更换图片</span></button><button class="remove-form-photo" data-action="remove-draft-image">删除图片</button>` : `<button class="form-photo placeholder" data-action="choose-draft-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>建议使用横向 4:3 照片</small></button>`}
         <input id="draft-file-input" class="hidden-input" type="file" accept="image/*">
       </section>
-      <section class="form-section"><label class="form-label" for="draft-name"><strong>����</strong><em>����</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="���磺�㳦������˿���"></section>
-      <section class="form-section"><div class="form-label"><strong>����</strong><span>�ɶ�ѡ</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
-      <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>��ͥ����</strong><small>����󣬼��˶��ܿ�����ֻ�д����ߺ͹���Ա�����޸ġ�</small></span></label></section>
-      ${formTextarea('ingredients', '����', 'ÿ��һ�ֲ��ϣ����磺\n���� 1��\n�㳦 1��')}
-      ${formTextarea('seasonings', '����', 'ÿ��һ�ֵ��ϣ����磺\n���� 2��\n�� ����')}
-      ${formTextarea('steps', '��������', 'ÿ��һ�����裬������Զ����', true)}
-      ${formTextarea('tips', 'ע������', '���磺��˿��ˮ����֭��Ҫ�յ�̫�ɡ�')}
-      ${isEditing ? '' : formTextarea('note', '��ע', '��¼������˵��ĵã�����ʱ���Զ��������ڡ�')}
-      <div class="form-bottom-actions"><button class="secondary-button" data-action="cancel-form">ȡ��</button><button class="primary-button" data-action="save-recipe">${isEditing ? '�����޸�' : '����'}</button></div>
-      ${isEditing ? '<button class="delete-recipe-button" data-action="request-delete-recipe">ɾ������</button>' : ''}
+      <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
+      <section class="form-section"><div class="form-label"><strong>分类</strong><span>可多选</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
+      <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>家庭共享</strong><small>开启后，家人都能看到；只有创建者和管理员可以修改。</small></span></label></section>
+      ${formTextarea('ingredients', '材料', '每行一种材料，例如：\n豆腐 1块\n香肠 1根')}
+      ${formTextarea('seasonings', '调料', '每行一种调料，例如：\n生抽 2勺\n盐 少许')}
+      ${formTextarea('steps', '制作步骤', '每行一个步骤，保存后自动编号', true)}
+      ${formTextarea('tips', '注意事项', '例如：粉丝吸水，汤汁不要收得太干。')}
+      ${isEditing ? '' : formTextarea('note', '备注', '记录这次做菜的心得，保存时会自动加入日期。')}
+      <div class="form-bottom-actions"><button class="secondary-button" data-action="cancel-form">取消</button><button class="primary-button" data-action="save-recipe">${isEditing ? '保存修改' : '保存'}</button></div>
+      ${isEditing ? '<button class="delete-recipe-button" data-action="request-delete-recipe">删除菜谱</button>' : ''}
     </main>${formExitPrompt ? unsavedChangesDialog() : ''}${deleteRecipePrompt ? deleteRecipeDialog() : ''}</div>`
 }
 
 function formTextarea(key, title, placeholder, tall = false) {
-  return `<section class="form-section"><label class="form-label" for="draft-${key}"><strong>${title}</strong><span>${key === 'ingredients' || key === 'seasonings' || key === 'steps' ? 'һ��һ��' : '��ѡ'}</span></label><textarea class="form-control ${tall ? 'tall' : ''}" id="draft-${key}" data-draft="${key}" placeholder="${placeholder}">${escapeHtml(draft[key])}</textarea></section>`
+  return `<section class="form-section"><label class="form-label" for="draft-${key}"><strong>${title}</strong><span>${key === 'ingredients' || key === 'seasonings' || key === 'steps' ? '一行一项' : '可选'}</span></label><textarea class="form-control ${tall ? 'tall' : ''}" id="draft-${key}" data-draft="${key}" placeholder="${placeholder}">${escapeHtml(draft[key])}</textarea></section>`
 }
 
-function actionSheet() { return `<div class="sheet-backdrop" data-action="close-menu"><div class="action-sheet"><div class="sheet-handle"></div><h2>ͼƬ����</h2><button data-action="view-image">�鿴��ͼ</button><button data-action="replace-image">����ͼƬ</button><button class="danger" data-action="delete-image">ɾ��ͼƬ</button><button class="cancel" data-action="close-menu">ȡ��</button></div></div>` }
-function imageLightbox(recipe) { return `<div class="image-lightbox"><button data-action="close-preview" aria-label="�رմ�ͼ">${icons.close}</button><div class="image-stage"><img id="preview-image" src="${recipe.image}" alt="${escapeHtml(recipe.name)}��ͼ"></div><p>˫����˫ָ����</p></div>` }
-function unsavedChangesDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">�Ƿ񱣴��޸ģ�</h2><p>��ղ��޸ĵ����ݻ�û�б��档</p><div class="confirm-actions"><button class="discard" data-action="discard-changes">������</button><button class="continue" data-action="continue-editing">�����༭</button><button class="save" data-action="save-and-exit">����</button></div></div></div>` }
-function deleteRecipeDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-recipe-title"><h2 id="delete-recipe-title">ȷ��Ҫɾ�����������</h2><p>ɾ�����޷��ָ���</p><div class="delete-confirm-actions"><button class="secondary-button" data-action="cancel-delete-recipe">ȡ��</button><button class="confirm-delete-button" data-action="confirm-delete-recipe">ȷ��ɾ��</button></div></div></div>` }
+function actionSheet() { return `<div class="sheet-backdrop" data-action="close-menu"><div class="action-sheet"><div class="sheet-handle"></div><h2>图片操作</h2><button data-action="view-image">查看大图</button><button data-action="replace-image">更换图片</button><button class="danger" data-action="delete-image">删除图片</button><button class="cancel" data-action="close-menu">取消</button></div></div>` }
+function imageLightbox(recipe) { return `<div class="image-lightbox"><button data-action="close-preview" aria-label="关闭大图">${icons.close}</button><div class="image-stage"><img id="preview-image" src="${recipe.image}" alt="${escapeHtml(recipe.name)}大图"></div><p>双击或双指缩放</p></div>` }
+function unsavedChangesDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">是否保存修改？</h2><p>你刚才修改的内容还没有保存。</p><div class="confirm-actions"><button class="discard" data-action="discard-changes">不保存</button><button class="continue" data-action="continue-editing">继续编辑</button><button class="save" data-action="save-and-exit">保存</button></div></div></div>` }
+function deleteRecipeDialog() { return `<div class="confirm-backdrop"><div class="confirm-dialog delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-recipe-title"><h2 id="delete-recipe-title">确定要删除这个菜谱吗？</h2><p>删除后无法恢复。</p><div class="delete-confirm-actions"><button class="secondary-button" data-action="cancel-delete-recipe">取消</button><button class="confirm-delete-button" data-action="confirm-delete-recipe">确认删除</button></div></div></div>` }
 
 function notesSection(recipe) {
   const notes = [...recipe.notes].sort((a, b) => b.date.localeCompare(a.date) || String(b.id).localeCompare(String(a.id)))
   const editable = canEditRecipe(recipe)
   const form = noteEditor ? `<div class="note-editor">
-    <label for="note-date"><span>����</span><input id="note-date" type="date" value="${noteEditor.date}"></label>
-    <label for="note-text"><span>��ע����</span><textarea id="note-text" placeholder="��¼������˵��ĵá���">${escapeHtml(noteEditor.text)}</textarea></label>
-    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-note">ȡ��</button><button class="primary-button" data-action="save-note">���汸ע</button></div>
+    <label for="note-date"><span>日期</span><input id="note-date" type="date" value="${noteEditor.date}"></label>
+    <label for="note-text"><span>备注内容</span><textarea id="note-text" placeholder="记录这次做菜的心得……">${escapeHtml(noteEditor.text)}</textarea></label>
+    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-note">取消</button><button class="primary-button" data-action="save-note">保存备注</button></div>
   </div>` : ''
-  const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time>${editable ? `<div class="note-actions"><button data-edit-note="${note.id}">�༭</button><button class="danger-text" data-delete-note="${note.id}">ɾ��</button></div>` : ''}</div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">��û�б�ע����������˺��һ�ʰɡ�</p>'
-  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>��ʷ��ע</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ ���ӱ�ע</button></div>' : ''}${form}${list}</div></section>`
+  const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time>${editable ? `<div class="note-actions"><button data-edit-note="${note.id}">编辑</button><button class="danger-text" data-delete-note="${note.id}">删除</button></div>` : ''}</div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有备注，做完这道菜后记一笔吧。</p>'
+  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
 }
 
 function cookRecordsSection(recipe) {
   const editable = canEditRecipe(recipe)
   const records = [...(recipe.cookRecords || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)))
   const form = cookEditor ? `<div class="note-editor cook-editor">
-    <label for="cook-date"><span>����ʱ��</span><input id="cook-date" type="date" value="${cookEditor.date}"></label>
-    <label for="cook-note"><span>��μ�¼</span><textarea id="cook-note" placeholder="���磺������̫Ӳ���´ζ��һ��ˮ��">${escapeHtml(cookEditor.note)}</textarea></label>
-    <label for="cook-rating"><span>�������</span><select id="cook-rating">${[0,1,2,3,4,5].map(value => `<option value="${value}" ${Number(cookEditor.rating || 0) === value ? 'selected' : ''}>${value ? `${value} ��` : '������'}</option>`).join('')}</select></label>
-    ${cookEditor.image ? `<button class="record-photo has-image" data-action="choose-cook-image"><img src="${cookEditor.image}" alt="�������ͼƬ"><span>����ͼƬ</span></button>` : `<button class="record-photo placeholder" data-action="choose-cook-image"><span class="placeholder-plus">+</span><strong>������ͼƬ</strong></button>`}
+    <label for="cook-date"><span>做菜时间</span><input id="cook-date" type="date" value="${cookEditor.date}"></label>
+    <label for="cook-note"><span>这次记录</span><textarea id="cook-note" placeholder="例如：今天面太硬，下次多加一点水。">${escapeHtml(cookEditor.note)}</textarea></label>
+    <label for="cook-rating"><span>这次评分</span><select id="cook-rating">${[0,1,2,3,4,5].map(value => `<option value="${value}" ${Number(cookEditor.rating || 0) === value ? 'selected' : ''}>${value ? `${value} 星` : '不评分'}</option>`).join('')}</select></label>
+    ${cookEditor.image ? `<button class="record-photo has-image" data-action="choose-cook-image"><img src="${cookEditor.image}" alt="这次做菜图片"><span>更换图片</span></button>` : `<button class="record-photo placeholder" data-action="choose-cook-image"><span class="placeholder-plus">+</span><strong>添加这次图片</strong></button>`}
     <input id="cook-file-input" class="hidden-input" type="file" accept="image/*">
-    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">ȡ��</button><button class="primary-button" data-action="save-cook-record">${cookEditor.id ? '�����޸�' : '�����¼'}</button></div>
+    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">取消</button><button class="primary-button" data-action="save-cook-record">${cookEditor.id ? '保存修改' : '保存记录'}</button></div>
   </div>` : ''
-  const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '����ͼƬ')}">`).join('')}</div>` : ''
-  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '��'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">�༭</button><button class="danger-text" data-delete-cook="${record.id}">ɾ��</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="���˼�¼ͼƬ">` : ''}<p>${escapeHtml(record.note || '���û�б�ע')}</p></article>`).join('')}</div>` : '<p class="empty-copy">��û�����˼�¼��ÿ��һ�Σ��ͼ�һ�ʡ�</p>'
-  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>06</span><h2>���˼�¼</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ ��¼���</button></div>' : ''}${form}${growth}${list}</div></section>`
+  const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
+  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">编辑</button><button class="danger-text" data-delete-cook="${record.id}">删除</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
+  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>06</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
 }
 
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
@@ -451,8 +490,8 @@ async function shareCurrentUrl() {
   const url = window.location.origin
   if (navigator.share) {
     await navigator.share({
-      title: '�ۼҲ���',
-      text: '�ۼҲ���',
+      title: '咱家菜谱',
+      text: '咱家菜谱',
       url,
     })
     return 'shared'
@@ -464,15 +503,15 @@ async function shareCurrentUrl() {
 function persistRecipes() {
   const serializable = serializeRecipes()
   localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
-  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB ���׻���д��ʧ�ܡ�', error))
-  saveCloudLibrary(serializable).catch(error => console.warn('�ƶ�ͬ��ʧ�ܣ������ѱ����ڱ�����', error))
+  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
+  saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
 }
 
 async function persistSingleRecipe(recipe) {
   await saveCloudRecipe(serializeRecipes([recipe])[0])
   const serializable = serializeRecipes()
   localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
-  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB ���׻���д��ʧ�ܡ�', error))
+  writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
 }
 
 function serializeRecipes(list = recipes) {
@@ -492,7 +531,7 @@ function recipeImageCacheKey(recipeOrImageId, version = '') {
 }
 
 async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {}) {
-  if (!file || !file.type?.startsWith('image/')) throw new Error('��ѡ��ͼƬ�ļ�')
+  if (!file || !file.type?.startsWith('image/')) throw new Error('请选择图片文件')
   const sourceUrl = URL.createObjectURL(file)
   try {
     const image = new Image()
@@ -501,11 +540,11 @@ async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {})
     if (image.decode) await image.decode()
     else await new Promise((resolve, reject) => {
       image.onload = resolve
-      image.onerror = () => reject(new Error('ͼƬ����ʧ��'))
+      image.onerror = () => reject(new Error('图片解码失败'))
     })
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
-    if (!sourceWidth || !sourceHeight) throw new Error('ͼƬ�ߴ��ȡʧ��')
+    if (!sourceWidth || !sourceHeight) throw new Error('图片尺寸读取失败')
     const scale = Math.min(1, maxSize / Math.max(sourceWidth, sourceHeight))
     const width = Math.max(1, Math.round(sourceWidth * scale))
     const height = Math.max(1, Math.round(sourceHeight * scale))
@@ -513,12 +552,12 @@ async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {})
     canvas.width = width
     canvas.height = height
     const context = canvas.getContext('2d', { colorSpace: 'srgb', alpha: false }) || canvas.getContext('2d', { alpha: false })
-    if (!context) throw new Error('������޷�����ͼƬ')
+    if (!context) throw new Error('浏览器无法处理图片')
     context.fillStyle = '#fff'
     context.fillRect(0, 0, width, height)
     context.drawImage(image, 0, 0, width, height)
     const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(result => result ? resolve(result) : reject(new Error('ͼƬת��ʧ��')), 'image/jpeg', quality)
+      canvas.toBlob(result => result ? resolve(result) : reject(new Error('图片转码失败')), 'image/jpeg', quality)
     })
     return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'recipe-image'}.jpg`, {
       type: 'image/jpeg',
@@ -595,8 +634,8 @@ async function storeImage(imageId, file, version = '') {
     transaction.objectStore(IMAGE_STORE).put(file, cacheKey)
     transaction.oncomplete = async () => {
       database.close()
-      await writeImageMeta(cacheKey, file).catch(error => console.warn('ͼƬ����Ԫ����д��ʧ�ܡ�', error))
-      pruneImageCache().catch(error => console.warn('ͼƬ��������ʧ�ܡ�', error))
+      await writeImageMeta(cacheKey, file).catch(error => console.warn('图片缓存元数据写入失败。', error))
+      pruneImageCache().catch(error => console.warn('图片缓存清理失败。', error))
       resolve()
     }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
@@ -749,7 +788,7 @@ async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true)
         if (blob) setRecordImageFromBlob(record, blob)
       }))
     } catch (error) {
-      console.warn('ͼƬ��ȡʧ�ܡ�', error)
+      console.warn('图片读取失败。', error)
     }
   }))
   if (shouldRender) render()
@@ -814,7 +853,7 @@ async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
       try {
         changed = await cacheRecipeImage(recipe) || changed
       } catch (error) {
-        console.warn('ͼƬԤ����ʧ�ܡ�', error)
+        console.warn('图片预加载失败。', error)
       }
     }
   } finally {
@@ -839,14 +878,14 @@ async function syncCloudLibrary({ force = false } = {}) {
     recipes = syncedRecipes
     const serializable = serializeRecipes()
     localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
-    writeRecipeCache(serializable).catch(error => console.warn('IndexedDB ���׻���д��ʧ�ܡ�', error))
+    writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
     if (!cloudLibraryExists) await saveCloudLibrary(serializable)
     if (shouldRender) render()
-    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('����ͼƬ�����ȡʧ�ܡ�', error))
-    preloadHomeImages().catch(error => console.warn('��ҳͼƬԤ����ʧ�ܡ�', error))
+    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
+    preloadHomeImages().catch(error => console.warn('首页图片预加载失败。', error))
   } catch (error) {
-    console.warn('�ƶ˲��׶�ȡʧ�ܣ�����ʹ�ñ������ݡ�', error)
-    if (!navigator.onLine) window.alert('��ǰ���ߣ�����ʾ���ػ��档��������Զ�ͬ����')
+    console.warn('云端菜谱读取失败，继续使用本机数据。', error)
+    if (!navigator.onLine) window.alert('当前离线，已显示本地缓存。联网后会自动同步。')
   }
 }
 
@@ -864,7 +903,7 @@ async function refreshFromCloud() {
   await syncCloudLibrary({ force: true })
   refreshing = false
   render()
-  preloadHomeImages().catch(error => console.warn('ˢ�º�ͼƬԤ����ʧ�ܡ�', error))
+  preloadHomeImages().catch(error => console.warn('刷新后图片预加载失败。', error))
 }
 
 function setupImagePreviewInteractions() {
@@ -1012,7 +1051,7 @@ async function saveRecipe() {
       uploadedImageId = imageId
       uploadedImageVersion = imageVersion
     } catch (error) {
-      window.alert('ͼƬ����ʧ�ܣ�������ѡ��ͼƬ��')
+      window.alert('图片保存失败，请重新选择图片。')
       if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
       return
     }
@@ -1035,7 +1074,7 @@ async function saveRecipe() {
     imageId,
     imageVersion,
     authorUserId: current?.authorUserId || currentUser?.id,
-    authorName: current?.authorName || currentUser?.displayName || '����',
+    authorName: current?.authorName || currentUser?.displayName || '家人',
     familyId: current?.familyId || currentUser?.familyId,
     isFamilyShared: Boolean(draft.isFamilyShared),
     createdByRole: current?.createdByRole || currentUser?.role || 'member',
@@ -1048,7 +1087,7 @@ async function saveRecipe() {
   } catch (error) {
     recipes = previousRecipes
     if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
-    window.alert('���ױ���ʧ�ܣ�ԭͼƬ�ѱ����')
+    window.alert('菜谱保存失败，原图片已保留。')
     render()
     return
   }
@@ -1056,7 +1095,7 @@ async function saveRecipe() {
     await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
     if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
   }
-  activeCategory = 'ȫ��'
+  activeCategory = '全部'
   query = ''
   page = isEditing ? 'detail' : 'home'
   selectedId = isEditing ? id : selectedId
@@ -1073,7 +1112,7 @@ async function deleteCurrentRecipe() {
   try {
     await deleteCloudRecipe(recipeId)
   } catch (error) {
-    window.alert('����ɾ��ʧ�ܣ�ͼƬ�������ѱ����')
+    window.alert('菜谱删除失败，图片和数据已保留。')
     return
   }
   const imageIds = [
@@ -1111,7 +1150,7 @@ function syncDraftFields() {
 
 function updateSearchResults() {
   const panel = document.querySelector('.recipe-panel')
-  if (panel) panel.innerHTML = `<div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '����ͬ�����²��ס�' : '����ˢ��'}</div>${recipePanelTemplate()}`
+  if (panel) panel.innerHTML = `<div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}`
   document.querySelector('.clear-search')?.classList.toggle('hidden', !query)
   requestAnimationFrame(setupPullToRefresh)
   preloadHomeImages().catch(() => null)
@@ -1156,7 +1195,7 @@ function saveNote() {
 
 function deleteNote(noteId) {
   if (!canEditRecipe(findRecipeById(selectedId))) return
-  if (!window.confirm('ȷ��ɾ��������ע��')) return
+  if (!window.confirm('确定删除这条备注吗？')) return
   recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? { ...recipe, notes: recipe.notes.filter(note => String(note.id) !== String(noteId)), modifiedAt: new Date().toISOString() } : recipe)
   noteEditor = null
   persistRecipes()
@@ -1173,7 +1212,7 @@ async function loadMembers() {
       familyMemberCount = members.length
     }
   } catch (error) {
-    console.warn('��Ա�б��ȡʧ�ܡ�', error)
+    console.warn('成员列表读取失败。', error)
   }
 }
 
@@ -1202,7 +1241,7 @@ async function createMember() {
   })
   const data = await response.json()
   if (!response.ok) {
-    window.alert(data.error || '������Աʧ��')
+    window.alert(data.error || '创建成员失败')
     return
   }
   memberDraft = { loginCode: '', displayName: '', pin: '' }
@@ -1219,7 +1258,7 @@ async function updateMember(id, changes) {
   })
   const data = await response.json()
   if (!response.ok) {
-    window.alert(data.error || '�����Աʧ��')
+    window.alert(data.error || '保存成员失败')
     return
   }
   await loadMembers()
@@ -1227,11 +1266,11 @@ async function updateMember(id, changes) {
 }
 
 async function deleteMember(id) {
-  if (!window.confirm('ȷ��ɾ�������Ա�˺���ɾ������˺Ų����ٵ�¼��')) return
+  if (!window.confirm('确定删除这个成员账号吗？删除后该账号不能再登录。')) return
   const response = await fetch(`/api/members?id=${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'same-origin' })
   const data = await response.json()
   if (!response.ok) {
-    window.alert(data.error || 'ɾ����Աʧ��')
+    window.alert(data.error || '删除成员失败')
     return
   }
   await loadMembers()
@@ -1268,12 +1307,12 @@ function copySelectedRecipe() {
   const copy = {
     ...source,
     id: Date.now(),
-    name: `${source.name}�������棩`,
+    name: `${source.name}（改良版）`,
     image: null,
     imageId: null,
     imageVersion: null,
     authorUserId: currentUser.id,
-    authorName: currentUser.displayName || '����',
+    authorName: currentUser.displayName || '家人',
     familyId: currentUser.familyId,
     isFamilyShared: false,
     createdByRole: currentUser.role,
@@ -1334,7 +1373,7 @@ async function saveCookRecord() {
       uploadedImageVersion = record.imageVersion
     } catch (error) {
       if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
-      window.alert('���˼�¼ͼƬ����ʧ�ܣ�������ѡ��ͼƬ��')
+      window.alert('做菜记录图片保存失败，请重新选择图片。')
       return
     }
   }
@@ -1352,7 +1391,7 @@ async function saveCookRecord() {
   } catch (error) {
     recipes = previousRecipes
     if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
-    window.alert('���˼�¼����ʧ�ܣ�ԭͼƬ�ѱ����')
+    window.alert('做菜记录保存失败，原图片已保留。')
     render()
     return
   }
@@ -1372,7 +1411,7 @@ async function deleteCookRecord(recordId) {
   if (!canEditRecipe(current)) return
   const record = (current.cookRecords || []).find(item => sameId(item.id, recordId))
   if (!record) return
-  if (!window.confirm('ȷ��Ҫɾ���������˼�¼��')) return
+  if (!window.confirm('确定要删除这条做菜记录吗？')) return
   const previousRecipes = recipes
   let updatedRecipe = null
   recipes = recipes.map(recipe => {
@@ -1386,7 +1425,7 @@ async function deleteCookRecord(recordId) {
     await persistSingleRecipe(updatedRecipe)
   } catch (error) {
     recipes = previousRecipes
-    window.alert('���˼�¼ɾ��ʧ�ܣ�ͼƬ�������ѱ����')
+    window.alert('做菜记录删除失败，图片和数据已保留。')
     render()
     return
   }
@@ -1499,7 +1538,7 @@ function setupPullToRefresh() {
     const visualDistance = Math.min(74, pullDistance * .45)
     indicator.classList.add('visible')
     indicator.style.transform = `translateY(${visualDistance}px)`
-    indicator.textContent = pullDistance > 86 ? '�ɿ�ˢ��' : '����ˢ��'
+    indicator.textContent = pullDistance > 86 ? '松开刷新' : '下拉刷新'
   }, { passive: true })
 
   const finish = () => {
@@ -1510,7 +1549,7 @@ function setupPullToRefresh() {
     if (shouldRefresh) refreshFromCloud()
     else {
       indicator.classList.remove('visible')
-      indicator.textContent = '����ˢ��'
+      indicator.textContent = '下拉刷新'
     }
   }
   panel.addEventListener('touchend', finish, { passive: true })
@@ -1541,18 +1580,18 @@ async function startApplication() {
   appStarted = true
   history.replaceState({ appPage: 'home' }, '')
   activeScope = 'mine'
-  activeCategory = 'ȫ��'
+  activeCategory = '全部'
   query = ''
   viewingMember = null
   settingsMenuOpen = false
   recipes = loadRecipes()
   render()
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('���߷������ʧ�ܡ�', error))
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
   hydrateRecipesFromIndexedDB().catch(() => null)
-  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('����ͼƬ�����ȡʧ�ܡ�', error))
-  hydrateRecipeImages(recipes, true).catch(error => console.warn('����ͼƬ�����ȡʧ�ܡ�', error))
-  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('��Ա�б��ȡʧ�ܡ�', error))
-  bootstrapCloudSync().catch(error => console.warn('��̨ͬ�����ʧ�ܡ�', error))
+  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
+  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
+  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
+  bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
 }
 
 window.addEventListener('popstate', event => {
@@ -1594,7 +1633,7 @@ async function checkAccess() {
     if (cachedUser) {
       return
     }
-    root.innerHTML = authTemplate('��ʱ�޷���֤���ʣ��������������')
+    root.innerHTML = authTemplate('暂时无法验证访问，请检查网络后重试')
   }
 }
 
@@ -1610,16 +1649,14 @@ root.addEventListener('input', event => {
 })
 
 root.addEventListener('submit', async event => {
-  if (event.target.id !== 'auth-form') return
+  if (event.target.id !== 'member-login-form' && event.target.id !== 'admin-login-form') return
   event.preventDefault()
   if (authBusy) return
   const formData = new FormData(event.target)
-  const account = String(formData.get('account') || '').trim()
-  const password = String(formData.get('password') || '')
-  const isAdmin = account.includes('@')
+  const isAdmin = event.target.id === 'admin-login-form'
   const payload = isAdmin
-    ? { mode: 'admin', email: account, password }
-    : { mode: 'member', loginCode: account, pin: password }
+    ? { mode: 'admin', email: formData.get('email'), password: formData.get('password') }
+    : { mode: 'member', loginCode: formData.get('loginCode'), pin: formData.get('pin') }
   authBusy = true
   root.innerHTML = authTemplate()
   try {
@@ -1637,12 +1674,13 @@ root.addEventListener('submit', async event => {
       return startApplication()
     }
     root.innerHTML = authTemplate(result.error || '登录失败')
-    document.getElementById('auth-account')?.focus()
+    document.getElementById(isAdmin ? 'admin-email' : 'member-code')?.focus()
   } catch {
     authBusy = false
     root.innerHTML = authTemplate('网络连接失败，请稍后重试')
   }
 })
+
 root.addEventListener('compositionstart', event => {
   if (event.target.id === 'search') searchIsComposing = true
 })
@@ -1676,7 +1714,7 @@ root.addEventListener('change', async event => {
       draftDirty = true
       render()
     } catch (error) {
-      window.alert('ͼƬ����ʧ�ܣ�������ѡ��һ����ͨ��Ƭ��')
+      window.alert('图片处理失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
     }
@@ -1690,7 +1728,7 @@ root.addEventListener('change', async event => {
       cookEditor.image = URL.createObjectURL(normalizedFile)
       render()
     } catch (error) {
-      window.alert('ͼƬ����ʧ�ܣ�������ѡ��һ����ͨ��Ƭ��')
+      window.alert('图片处理失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
     }
@@ -1715,7 +1753,7 @@ root.addEventListener('change', async event => {
       } catch (error) {
         recipes = previousRecipes
         await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
-        window.alert('���ױ���ʧ�ܣ�ԭͼƬ�ѱ����')
+        window.alert('菜谱保存失败，原图片已保留。')
         render()
         return
       }
@@ -1724,7 +1762,7 @@ root.addEventListener('change', async event => {
       render()
     } catch (error) {
       await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
-      window.alert('ͼƬ����򱣴�ʧ�ܣ�������ѡ��һ����ͨ��Ƭ��')
+      window.alert('图片处理或保存失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
     }
@@ -1753,7 +1791,7 @@ root.addEventListener('click', async event => {
   if (!target) return
   const action = target.dataset.action
   if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
-  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = 'ȫ��'; render(); return }
+  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
@@ -1766,7 +1804,7 @@ root.addEventListener('click', async event => {
     if (member) {
       viewingMember = { id: member.id, displayName: member.displayName }
       activeScope = 'mine'
-      activeCategory = 'ȫ��'
+      activeCategory = '全部'
       query = ''
       settingsMenuOpen = false
       page = 'home'
@@ -1780,13 +1818,13 @@ root.addEventListener('click', async event => {
     return
   }
   if (target.dataset.memberPin) {
-    const pin = window.prompt('�������µ� PIN / ���룬���� 4 λ')
+    const pin = window.prompt('请输入新的 PIN / 密码，至少 4 位')
     if (pin) updateMember(target.dataset.memberPin, { pin })
     return
   }
   if (target.dataset.memberRename) {
     const member = members.find(item => sameId(item.id, target.dataset.memberRename))
-    const displayName = window.prompt('�������µ���ʾ����', member?.displayName || '')
+    const displayName = window.prompt('请输入新的显示名称', member?.displayName || '')
     if (displayName) updateMember(target.dataset.memberRename, { displayName })
     return
   }
@@ -1806,13 +1844,13 @@ root.addEventListener('click', async event => {
   if (action === 'share-url') {
     try {
       const result = await shareCurrentUrl()
-      if (result === 'copied') window.alert('��ַ�Ѹ���')
+      if (result === 'copied') window.alert('网址已复制')
     } catch (error) {
       try {
         await copyCurrentUrl()
-        window.alert('��ַ�Ѹ���')
+        window.alert('网址已复制')
       } catch {
-        window.alert('��ַ�Ѹ���ʧ��')
+        window.alert('网址已复制失败')
       }
     }
     return
@@ -1820,32 +1858,32 @@ root.addEventListener('click', async event => {
   if (action === 'settings') { settingsMenuOpen = !settingsMenuOpen; render(); return }
   if (action === 'close-settings') { settingsMenuOpen = false; render(); return }
   if (action === 'account-info') {
-    window.alert(`��ǰ�˺ţ�${currentAccountName()}${currentUser?.loginCode ? `\n�˺ű�ţ�${currentUser.loginCode}` : ''}`)
+    window.alert(`当前账号：${currentAccountName()}${currentUser?.loginCode ? `\n账号编号：${currentUser.loginCode}` : ''}`)
     settingsMenuOpen = false
     render()
     return
   }
-  if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = 'ȫ��'; query = ''; render(); return }
+  if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = '全部'; query = ''; render(); return }
   if (action === 'members') { settingsMenuOpen = false; openMembersPage(); return }
   if (action === 'cleanup-images') {
     settingsMenuOpen = false
     try {
       const result = await cleanupCloudImages()
-      window.alert(`ͼƬ������ɣ�ɨ�� ${result.scanned} �ţ�ɾ�� ${result.deleted} �š�`)
+      window.alert(`图片清理完成：扫描 ${result.scanned} 张，删除 ${result.deleted} 张。`)
     } catch (error) {
-      window.alert('ͼƬ����ʧ�ܣ����Ժ����ԡ�')
+      window.alert('图片清理失败，请稍后重试。')
     }
     render()
     return
   }
   if (action === 'clear-local-cache') {
     settingsMenuOpen = false
-    if (!window.confirm('ȷ��������ػ����𣿵�¼״̬�ᱣ������׺�ͼƬ�����´ӷ�������ȡ��')) { render(); return }
+    if (!window.confirm('确定清除本地缓存吗？登录状态会保留，菜谱和图片会重新从服务器读取。')) { render(); return }
     try {
       await clearLocalCacheAndReload()
-      window.alert('���ػ������������������ͬ�����������ݡ�')
+      window.alert('本地缓存已清除，并已重新同步服务器数据。')
     } catch (error) {
-      window.alert('�������ʧ�ܣ����Ժ����ԡ�')
+      window.alert('清除缓存失败，请稍后重试。')
       render()
     }
     return
@@ -1914,7 +1952,7 @@ root.addEventListener('click', async event => {
       await persistSingleRecipe(updatedRecipe)
     } catch (error) {
       recipes = previousRecipes
-      window.alert('ͼƬɾ��ʧ�ܣ�ԭͼƬ�ѱ����')
+      window.alert('图片删除失败，原图片已保留。')
       render()
       return
     }
@@ -1924,12 +1962,9 @@ root.addEventListener('click', async event => {
     render()
     return
   }
-if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
-if (action === 'close-preview') { imagePreview = false; render() }
+  if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
+  if (action === 'close-preview') { imagePreview = false; render() }
 })
-applyTheme()
-checkAccess()
-/*
 
 var recipeComments = []
 var recipeCommentsRecipeId = null
@@ -1973,54 +2008,54 @@ function homeStats() {
 }
 
 function currentAccountName() {
-  if (currentUser?.role === 'guest') return '�ο�'
-  return currentUser?.displayName || (isAdmin() ? '����Ա' : '��')
+  if (currentUser?.role === 'guest') return '游客'
+  return currentUser?.displayName || (isAdmin() ? '管理员' : '我')
 }
 
 function homeSubtitle() {
-  if (currentUser?.role === 'guest') return '�ο���� �� ���鿴��ͥ�������'
-  if (viewingMember) return `���ڲ鿴��${viewingMember.displayName}�Ĳ���`
-  return `${currentAccountName()}�Ĳ���`
+  if (currentUser?.role === 'guest') return '游客浏览 · 仅查看家庭共享菜谱'
+  if (viewingMember) return `正在查看：${viewingMember.displayName}的菜谱`
+  return `${currentAccountName()}的菜谱`
 }
 
 function scopeTitle() {
-  if (viewingMember) return `${viewingMember.displayName}�Ĳ���`
-  if (currentUser?.role === 'guest') return '��ͥ����'
-  if (activeScope === 'shared') return '��ͥ����'
-  return '�ҵĲ���'
+  if (viewingMember) return `${viewingMember.displayName}的菜谱`
+  if (currentUser?.role === 'guest') return '家庭共享'
+  if (activeScope === 'shared') return '家庭共享'
+  return '我的菜谱'
 }
 
 function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
   const selectedRecipe = findRecipeById(selectedId)
   if (currentUser?.role === 'guest') {
-    return `<div class="settings-popover" role="dialog" aria-label="���ò˵�">
-      <button data-action="guest-exit">�˳��ο�ģʽ</button>
-      <button class="muted" data-action="close-settings">ȡ��</button>
+    return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+      <button data-action="guest-exit">退出游客模式</button>
+      <button class="muted" data-action="close-settings">取消</button>
     </div>`
   }
-  return `<div class="settings-popover" role="dialog" aria-label="���ò˵�">
-    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">��������</button>'}
-    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">�༭����</button>' : ''}
-    <button data-action="account-info">�˺���Ϣ</button>
-    ${isAdmin() ? '<button data-action="members">��Ա����</button><button data-action="cleanup-images">����ͼƬ����</button>' : ''}
+  return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
+    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
+    <button data-action="account-info">账号信息</button>
+    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
     <div class="app-info-panel">
       <div class="app-info-row compact">
-        <span>��ǰ�汾</span>
+        <span>当前版本</span>
         <strong>${APP_VERSION}</strong>
       </div>
     </div>
-    <button data-action="clear-local-cache">������ػ���</button>
-    <button data-action="logout">�˳���¼</button>
-    <button class="muted" data-action="close-settings">ȡ��</button>
+    <button data-action="clear-local-cache">清除本地缓存</button>
+    <button data-action="logout">退出登录</button>
+    <button class="muted" data-action="close-settings">取消</button>
   </div>`
 }
 
 function globalActionsTemplate() {
-  return `<div class="global-actions" aria-label="ȫ�ֲ���">
-    <button class="global-icon-button" data-action="toggle-theme" aria-label="�л�����">${themeMode === 'dark' ? '??' : '??'}</button>
-    <button class="global-icon-button" data-action="share-url" aria-label="������ַ">??</button>
-    <button class="global-icon-button" data-action="settings" aria-label="�˵�">?</button>
+  return `<div class="global-actions" aria-label="全局操作">
+    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
+    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
+    <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
   </div>`
 }
 
@@ -2030,40 +2065,39 @@ function statsTemplate() {
   const sharedActive = !viewingMember && activeScope === 'shared'
   if (currentUser?.role === 'guest') {
     return `<div class="home-stats guest-stats">
-      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>��ͥ����</span></button>
-      <span class="stat-card disabled"><strong>�ο�</strong><span>�����</span></span>
+      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+      <span class="stat-card disabled"><strong>游客</strong><span>仅浏览</span></span>
     </div>`
   }
   return `<div class="home-stats">
-    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>�ҵĲ���</span></button>
-    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>��ͥ����</span></button>
-    <span class="stat-card disabled"><strong>${stats.members}</strong><span>��ͥ��Ա</span></span>
+    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
+    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
   </div>`
 }
 
 function authTemplate(message = '') {
-  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">��</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>�ۼҲ���</h1><p>��ͥ˽������</p>
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
     <form id="member-login-form" class="login-form">
-      <h2>��ͥ��Ա��¼</h2>
-      <label for="member-code">�˺ű��</label>
-      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="���磺001" autofocus>
-      <label for="member-pin">PIN / ����</label>
-      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="������ PIN">
-      <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '���ڽ��롭' : '�������'}</button>
+      <h2>家庭成员登录</h2>
+      <label for="member-code">账号编号</label>
+      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
+      <label for="member-pin">PIN / 密码</label>
+      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
+      <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
     </form>
     <details class="admin-login-panel">
-      <summary>����Ա�����¼</summary>
+      <summary>管理员邮箱登录</summary>
       <form id="admin-login-form" class="login-form">
-        <label for="admin-email">����</label>
-        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="����Ա����">
-        <label for="admin-password">����</label>
-        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="����Ա����">
-        <button type="submit" ${authBusy ? 'disabled' : ''}>����Ա����</button>
+        <label for="admin-email">邮箱</label>
+        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
+        <label for="admin-password">密码</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
+        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
       </form>
     </details>
-    <button class="guest-login-button" type="button" data-action="guest-login">�ο����</button>
-    <button class="guest-login-button" type="button" data-action="guest-login">�ο����</button>
-    <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>������ע�ᣬ�˺��ɹ���Ա����</small></section></main>`
+    <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
+    <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
 
 async function openRecipeComments(recipeId) {
@@ -2077,7 +2111,7 @@ async function openRecipeComments(recipeId) {
     recipeComments = Array.isArray(data.comments) ? data.comments : []
     if (page === 'detail' && sameId(selectedId, recipeId)) render()
   } catch (error) {
-    console.warn('���Զ�ȡʧ��', error)
+    console.warn('留言读取失败', error)
   } finally {
     recipeCommentsLoading = false
   }
@@ -2089,35 +2123,35 @@ function commentsSection(recipe) {
   const canDeleteComment = isAdmin() || sameId(recipe.authorUserId, currentUser?.id)
   const list = comments.length
     ? `<div class="comment-list">${comments.map(comment => `<article class="comment-item">
-        <div class="comment-meta"><strong>${escapeHtml(comment.guest_name || '����')}</strong><time>${escapeHtml((comment.created_at || '').replace('T', ' ').slice(0, 16))}</time>${canDeleteComment ? `<button class="danger-text" data-action="delete-comment" data-comment-id="${escapeHtml(comment.id)}">ɾ��</button>` : ''}</div>
+        <div class="comment-meta"><strong>${escapeHtml(comment.guest_name || '匿名')}</strong><time>${escapeHtml((comment.created_at || '').replace('T', ' ').slice(0, 16))}</time>${canDeleteComment ? `<button class="danger-text" data-action="delete-comment" data-comment-id="${escapeHtml(comment.id)}">删除</button>` : ''}</div>
         <p>${escapeHtml(comment.content || '')}</p>
       </article>`).join('')}</div>`
-    : '<p class="empty-copy">��û�����ԡ�</p>'
+    : '<p class="empty-copy">还没有留言。</p>'
   const form = canWriteComment ? `<div class="comment-form">
-    <label><span>�ǳ�</span><input id="guest-comment-name" value="${escapeHtml(guestCommentDraft.guestName || currentUser?.displayName || '�ο�')}" placeholder="�������ǳ�"></label>
-    <label><span>��������</span><textarea id="guest-comment-content" maxlength="300" placeholder="д������˵�Ļ�">${escapeHtml(guestCommentDraft.content || '')}</textarea></label>
-    <div class="comment-form-actions"><button class="secondary-button" data-action="guest-comment-clear">���</button><button class="primary-button" data-action="save-guest-comment" ${guestCommentBusy ? 'disabled' : ''}>�ύ����</button></div>
+    <label><span>昵称</span><input id="guest-comment-name" value="${escapeHtml(guestCommentDraft.guestName || currentUser?.displayName || '游客')}" placeholder="请输入昵称"></label>
+    <label><span>留言内容</span><textarea id="guest-comment-content" maxlength="300" placeholder="写下你想说的话">${escapeHtml(guestCommentDraft.content || '')}</textarea></label>
+    <div class="comment-form-actions"><button class="secondary-button" data-action="guest-comment-clear">清空</button><button class="primary-button" data-action="save-guest-comment" ${guestCommentBusy ? 'disabled' : ''}>提交留言</button></div>
   </div>` : ''
-  return `<section class="recipe-section comments-section"><div class="recipe-section-title"><span>07</span><h2>������</h2></div><div class="recipe-section-body">${recipe.isFamilyShared ? '' : '<p class="empty-copy">����ͥ�������֧�����ԡ�</p>'}${form}${recipeCommentsRecipeId === recipe.id && recipeCommentsLoading ? '<p class="empty-copy">���ڼ������ԡ�</p>' : ''}${list}</div></section>`
+  return `<section class="recipe-section comments-section"><div class="recipe-section-title"><span>07</span><h2>留言区</h2></div><div class="recipe-section-body">${recipe.isFamilyShared ? '' : '<p class="empty-copy">仅家庭共享菜谱支持留言。</p>'}${form}${recipeCommentsRecipeId === recipe.id && recipeCommentsLoading ? '<p class="empty-copy">正在加载留言…</p>' : ''}${list}</div></section>`
 }
 
 function detailTemplate(recipe) {
   const editable = canEditRecipe(recipe)
   const showWritingActions = currentUser?.role !== 'guest'
-  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="����">${icons.back}</button><div class="detail-header-title">��������</div>${globalActionsTemplate()}</header>
+  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
     ${settingsMenuTemplate()}
-    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">�ۼҵ����ֲ�</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">?</div></div>
-      <div class="recipe-author-line">��¼�ˣ�${escapeHtml(recipe.authorName || '����')}${recipe.isFamilyShared ? ` �� �����ˣ�${escapeHtml(recipe.authorName || '����')}` : ''} �� ���� ${recipe.cookCount || 0} ��</div>
+    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">◌</div></div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
       <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
-        <div><strong>��ǰ״̬��${recipe.isFamilyShared ? '???????? ��ͥ����' : '?? ˽�˲���'}</strong><small>${recipe.isFamilyShared ? '���м�ͥ��Ա���ܿ�������ˡ�' : 'ֻ�д����ߺ͹���Ա���Կ�����'}</small></div>
-        <label class="share-switch ${editable ? '' : 'disabled'}"><span>�������ͥ</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
+        <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能看到这道菜。' : '只有创建者和管理员可以看到。'}</small></div>
+        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
       </div>
-      ${showWritingActions ? `<div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '�� ���ղ�' : '�� �ղ�'}</button><button data-action="copy-recipe">���Ʋ���</button></div>` : ''}
+      ${showWritingActions ? `<div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
-      ${section('01', '����', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('02', '����', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('03', '��������', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
-      ${section('04', 'ע������', `<p class="body-copy">${escapeHtml(recipe.tips || '����')}</p>`)}
+      ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
+      ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
       ${notesSection(recipe)}
       ${commentsSection(recipe)}
       ${cookRecordsSection(recipe)}
@@ -2148,22 +2182,27 @@ function render(preserveFocus = false) {
 
 async function startApplication() {
   if (appStarted) return
-  appStarted = true
-  history.replaceState({ appPage: 'home' }, '')
-  activeScope = currentUser?.role === 'guest' ? 'shared' : 'mine'
-  activeCategory = '全部'
-  query = ''
-  viewingMember = null
-  settingsMenuOpen = false
-  clearRecipeComments()
-  recipes = loadRecipes()
-  render()
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('离线服务启动失败�?, error))
-  hydrateRecipesFromIndexedDB().catch(() => null)
-  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败�?, error))
-  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败�?, error))
-  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败�?, error))
-  bootstrapCloudSync().catch(error => console.warn('后台同步启动失败�?, error))
+  try {
+    appStarted = true
+    history.replaceState({ appPage: 'home' }, '')
+    activeScope = currentUser?.role === 'guest' ? 'shared' : 'mine'
+    activeCategory = '全部'
+    query = ''
+    viewingMember = null
+    settingsMenuOpen = false
+    clearRecipeComments()
+    recipes = loadRecipes()
+    render()
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
+    hydrateRecipesFromIndexedDB().catch(() => null)
+    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
+    hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
+    if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
+    bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
+  } catch (error) {
+    appStarted = false
+    showStartupFailure(error)
+  }
 }
 
 function openRecipe(recipeId) {
@@ -2209,11 +2248,11 @@ async function saveGuestComment() {
   const guestName = String(document.getElementById('guest-comment-name')?.value || '').trim()
   const content = String(document.getElementById('guest-comment-content')?.value || '').trim()
   if (!guestName || !content) {
-    window.alert('�ǳƺ����Բ���Ϊ��')
+    window.alert('昵称和留言不能为空')
     return
   }
   if (content.length > 300) {
-    window.alert('������� 300 ��')
+    window.alert('留言最多 300 字')
     return
   }
   guestCommentBusy = true
@@ -2228,14 +2267,14 @@ async function saveGuestComment() {
     })
     const result = await response.json()
     if (!response.ok) {
-      window.alert(result.error || '�����ύʧ��')
+      window.alert(result.error || '留言提交失败')
       return
     }
     guestCommentDraft = { guestName: '', content: '' }
     await openRecipeComments(recipe.id)
     render()
   } catch (error) {
-    window.alert('�����ύʧ�ܣ����Ժ�����')
+    window.alert('留言提交失败，请稍后重试')
   } finally {
     guestCommentBusy = false
     render()
@@ -2245,14 +2284,14 @@ async function saveGuestComment() {
 async function deleteGuestComment(commentId) {
   const recipe = findRecipeById(selectedId)
   if (!recipe || !commentId) return
-  if (!window.confirm('ȷ��Ҫɾ������������')) return
+  if (!window.confirm('确定要删除这条留言吗？')) return
   const response = await fetch(`/api/comments?recipeId=${encodeURIComponent(recipe.id)}&id=${encodeURIComponent(commentId)}`, {
     method: 'DELETE',
     credentials: 'same-origin',
   })
   const result = await response.json().catch(() => ({}))
   if (!response.ok) {
-    window.alert(result.error || '����ɾ��ʧ��')
+    window.alert(result.error || '留言删除失败')
     return
   }
   await openRecipeComments(recipe.id)
@@ -2286,7 +2325,7 @@ root.addEventListener('click', async event => {
       })
       const result = await response.json()
       if (!response.ok) {
-        root.innerHTML = authTemplate(result.error || '�ο����ʧ��')
+        root.innerHTML = authTemplate(result.error || '游客浏览失败')
         return
       }
       currentUser = result.user
@@ -2294,7 +2333,7 @@ root.addEventListener('click', async event => {
       appStarted = false
       await startApplication()
     } catch (error) {
-      root.innerHTML = authTemplate('�ο����ʧ�ܣ����Ժ�����')
+      root.innerHTML = authTemplate('游客浏览失败，请稍后重试')
     } finally {
       authBusy = false
     }
@@ -2322,8 +2361,8 @@ root.addEventListener('click', async event => {
   if (action === 'save-guest-comment') { event.preventDefault(); await saveGuestComment(); return }
   if (action === 'guest-comment-clear') { guestCommentDraft = { guestName: '', content: '' }; render(); return }
   if (action === 'delete-comment' && target.dataset.commentId) { await deleteGuestComment(target.dataset.commentId); return }
+  if (action === 'reload-app') { await reloadLatestVersion(); return }
 })
 
 applyTheme()
 checkAccess()
-*/
