@@ -1933,9 +1933,10 @@ root.addEventListener('click', async event => {
     render()
     return
   }
-  if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
-  if (action === 'close-preview') { imagePreview = false; render() }
+if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
+if (action === 'close-preview') { imagePreview = false; render() }
 })
+/*
 
 var recipeComments = []
 var recipeCommentsRecipeId = null
@@ -2331,3 +2332,4 @@ root.addEventListener('click', async event => {
 
 applyTheme()
 checkAccess()
+*/
