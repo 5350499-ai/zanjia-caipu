@@ -747,6 +747,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
   --primary: #9c4b3d;
   --primary-text: #fffaf6;
   --input-bg: #ffffff;
+  --placeholder: #a39a8f;
 }
 
 :root[data-theme="dark"] {
@@ -758,6 +759,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
   --primary: #b15b4d;
   --primary-text: #fff8f0;
   --input-bg: #2a241f;
+  --placeholder: #afa59b;
 }
 
 body {
@@ -819,6 +821,28 @@ body {
 .detail-accordion,
 .form-section {
   color: var(--text);
+}
+
+.form-section .form-label,
+.form-section .form-label strong,
+.form-section .share-toggle strong,
+.form-section .share-toggle span {
+  color: var(--text);
+}
+
+.form-section .form-label span,
+.form-section .form-label em,
+.form-section .share-toggle small,
+.form-section .form-photo small,
+.form-section .remove-form-photo {
+  color: var(--text-muted);
+}
+
+.form-control::placeholder,
+.note-editor textarea::placeholder,
+.comment-form input::placeholder,
+.comment-form textarea::placeholder {
+  color: var(--placeholder);
 }
 
 .account-subtitle,
@@ -1010,6 +1034,112 @@ body {
   background: var(--input-bg);
   color: var(--text);
   border-color: var(--border);
+}
+
+:root[data-theme="dark"] .form-section .form-label,
+:root[data-theme="dark"] .form-section .form-label strong,
+:root[data-theme="dark"] .form-section .share-toggle strong,
+:root[data-theme="dark"] .form-section .share-toggle span,
+:root[data-theme="dark"] .recipe-form .form-label,
+:root[data-theme="dark"] .recipe-form .form-label strong {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .form-section .form-label span,
+:root[data-theme="dark"] .form-section .form-label em,
+:root[data-theme="dark"] .form-section .share-toggle small,
+:root[data-theme="dark"] .form-section .form-photo small,
+:root[data-theme="dark"] .form-section .remove-form-photo,
+:root[data-theme="dark"] .recipe-form .muted,
+:root[data-theme="dark"] .recipe-form small,
+:root[data-theme="dark"] .recipe-form .help-text {
+  color: var(--text-muted);
+}
+
+:root[data-theme="dark"] .form-control::placeholder,
+:root[data-theme="dark"] .note-editor textarea::placeholder,
+:root[data-theme="dark"] .comment-form input::placeholder,
+:root[data-theme="dark"] .comment-form textarea::placeholder {
+  color: var(--placeholder);
+}
+
+:root[data-theme="dark"] .category-picker button {
+  background: #2b2622;
+  border-color: #5a5048;
+  color: #e9e2d9;
+}
+
+:root[data-theme="dark"] .recipe-form .category-picker button {
+  background: #2b2622;
+  border-color: #5a5048;
+  color: #e9e2d9;
+}
+
+:root[data-theme="dark"] .category-picker button.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .recipe-form .category-picker button.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .share-toggle {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .recipe-form .share-toggle {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .share-toggle input + i {
+  background: #4c443d;
+}
+
+:root[data-theme="dark"] .share-toggle input:checked + i {
+  background: var(--primary);
+}
+
+:root[data-theme="dark"] .share-toggle input + i::after {
+  background: #f7f2eb;
+}
+
+:root[data-theme="dark"] .form-photo.placeholder,
+:root[data-theme="dark"] .recipe-card .image-area.placeholder,
+:root[data-theme="dark"] .record-photo.placeholder {
+  background: #2b2622;
+  color: #e9e2d9;
+  border-color: #5a5048;
+}
+
+:root[data-theme="dark"] .form-photo.has-image span {
+  background: rgba(12, 11, 10, .7);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .secondary-button {
+  background: #2f2924;
+  color: #f3eee7;
+  border-color: #5a5048;
+}
+
+:root[data-theme="dark"] .primary-button,
+:root[data-theme="dark"] .confirm-actions .save,
+:root[data-theme="dark"] .form-bottom-actions .primary-button,
+:root[data-theme="dark"] .notes-toolbar button,
+:root[data-theme="dark"] .guest-login-button {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+:root[data-theme="dark"] .delete-recipe-button {
+  background: #352722;
+  border-color: #8a4339;
+  color: #ffcbc5;
 }
 
 :root[data-theme="dark"] .recipe-section,
