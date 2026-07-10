@@ -212,45 +212,12 @@ function findRecipeById(id) {
   return recipes.find(recipe => sameId(recipe.id, id))
 }
 
-function matchScope(recipe) {
-  if (!currentUser) return true
-  if (viewingMember) return sameId(recipe.authorUserId, viewingMember.id)
-  if (activeScope === 'mine') return sameId(recipe.authorUserId, currentUser.id)
-  if (activeScope === 'shared') return Boolean(recipe.isFamilyShared)
-  return sameId(recipe.authorUserId, currentUser.id)
-}
-
 function isAdmin() {
   return currentUser?.role === 'admin'
 }
 
-function canEditRecipe(recipe) {
-  return isAdmin() || sameId(recipe?.authorUserId, currentUser?.id)
-}
-
-function canViewRecipe(recipe) {
-  return Boolean(recipe && (isAdmin() || sameId(recipe.authorUserId, currentUser?.id) || recipe.isFamilyShared))
-}
-
 function isFavorite(recipe) {
   return Boolean(currentUser?.id && (recipe?.favoriteUserIds || []).includes(currentUser.id))
-}
-
-function homeStats() {
-  return {
-    mine: recipes.filter(recipe => sameId(recipe.authorUserId, currentUser?.id)).length,
-    shared: recipes.filter(recipe => recipe.isFamilyShared).length,
-    members: familyMemberCount || members.length || (isAdmin() ? 1 : 0),
-  }
-}
-
-function currentAccountName() {
-  return currentUser?.displayName || (isAdmin() ? '管理员' : '我')
-}
-
-function homeSubtitle() {
-  if (viewingMember) return `正在查看：${viewingMember.displayName}的菜谱`
-  return `${currentAccountName()}的菜谱`
 }
 
 function relativeDate(dateText) {
@@ -262,29 +229,6 @@ function relativeDate(dateText) {
   if (diff === 1) return '昨天'
   if (diff > 1) return `${diff}天前`
   return dateText.slice(0, 10)
-}
-
-function authTemplate(message = '') {
-  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
-    <form id="member-login-form" class="login-form">
-      <h2>家庭成员登录</h2>
-      <label for="member-code">账号编号</label>
-      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
-      <label for="member-pin">PIN / 密码</label>
-      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
-      <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
-    </form>
-    <details class="admin-login-panel">
-      <summary>管理员邮箱登录</summary>
-      <form id="admin-login-form" class="login-form">
-        <label for="admin-email">邮箱</label>
-        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
-        <label for="admin-password">密码</label>
-        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
-        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
-      </form>
-    </details>
-    <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
 
 function authLoadingTemplate() {
@@ -341,52 +285,6 @@ function recipePanelTemplate() {
     ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>没有找到相关菜谱</h3><p>换个菜名或材料试试</p></div>`}</div>`
 }
 
-function scopeTitle() {
-  if (viewingMember) return `${viewingMember.displayName}的菜谱`
-  if (activeScope === 'mine') return '我的菜谱'
-  if (activeScope === 'shared') return '家庭共享'
-  return '我的菜谱'
-}
-
-function settingsMenuTemplate() {
-  if (!settingsMenuOpen) return ''
-  const selectedRecipe = findRecipeById(selectedId)
-  return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
-    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
-    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
-    <button data-action="account-info">账号信息</button>
-    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
-    <div class="app-info-panel">
-      <div class="app-info-row compact">
-        <span>版本</span>
-        <strong>${APP_VERSION}</strong>
-      </div>
-    </div>
-    <button data-action="clear-local-cache">清除本地缓存</button>
-    <button data-action="logout">退出登录</button>
-    <button class="muted" data-action="close-settings">取消</button>
-  </div>`
-}
-
-function globalActionsTemplate() {
-  return `<div class="global-actions" aria-label="全局操作">
-    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
-    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
-    <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
-  </div>`
-}
-
-function statsTemplate() {
-  const stats = homeStats()
-  const mineActive = !viewingMember && activeScope === 'mine'
-  const sharedActive = !viewingMember && activeScope === 'shared'
-  return `<div class="home-stats">
-    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
-    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
-    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
-  </div>`
-}
-
 function homeTemplate() {
   return `<div class="app-shell home-shell">
     <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
@@ -432,27 +330,6 @@ function membersTemplate() {
 
 function section(number, title, body) {
   return `<section class="recipe-section"><div class="recipe-section-title"><span>${number}</span><h2>${title}</h2></div><div class="recipe-section-body">${body}</div></section>`
-}
-
-function detailTemplate(recipe) {
-  const editable = canEditRecipe(recipe)
-  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
-    ${settingsMenuTemplate()}
-    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">⌄</div></div>
-      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
-      <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
-        <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能在「家庭共享」里看到。' : '只有创建者和管理员可以看到。'}</small></div>
-        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
-      </div>
-      <div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>
-      ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
-      ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
-      ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
-      ${notesSection(recipe)}
-      ${cookRecordsSection(recipe)}
-    </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
 }
 
 function newRecipeTemplate() {
@@ -1485,32 +1362,6 @@ async function deleteCookRecord(recordId) {
   render()
 }
 
-function openRecipe(recipeId) {
-  const viewedAt = new Date().toISOString()
-  const recipe = findRecipeById(recipeId)
-  if (!canViewRecipe(recipe)) return
-  recipes = recipes.map(recipe => sameId(recipe.id, recipeId) ? { ...recipe, lastViewedAt: viewedAt } : recipe)
-  persistRecipes()
-  selectedId = recipeId
-  page = 'detail'
-  history.pushState({ appPage: 'detail', recipeId }, '')
-  render()
-}
-
-function goHome(fromHistory = false) {
-  if (!fromHistory && history.state?.appPage === 'detail') {
-    history.back()
-    return
-  }
-  selectedId = null
-  imageMenu = false
-  imagePreview = false
-  noteEditor = null
-  settingsMenuOpen = false
-  page = 'home'
-  render()
-}
-
 function setupEdgeSwipeBack() {
   const shell = document.querySelector('.detail-shell')
   if (!shell || imageMenu || imagePreview) return
@@ -1605,56 +1456,6 @@ function setupPullToRefresh() {
   panel.addEventListener('touchend', finish, { passive: true })
   panel.addEventListener('touchcancel', finish, { passive: true })
 }
-
-function render(preserveFocus = false) {
-  if (page === 'new' || page === 'edit') root.innerHTML = newRecipeTemplate()
-  else if (page === 'members') root.innerHTML = membersTemplate()
-  else if (page === 'detail') {
-    const recipe = findRecipeById(selectedId)
-    root.innerHTML = canViewRecipe(recipe) ? detailTemplate(recipe) : homeTemplate()
-    if (!canViewRecipe(recipe)) { page = 'home'; selectedId = null }
-  }
-  else root.innerHTML = homeTemplate()
-  if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
-  if (imagePreview) setupImagePreviewInteractions()
-  if (page === 'detail') setupEdgeSwipeBack()
-  if (page === 'home') requestAnimationFrame(() => {
-    centerActiveCategory()
-    setupPullToRefresh()
-    preloadHomeImages().catch(() => null)
-  })
-}
-
-async function startApplication() {
-  if (appStarted) return
-  appStarted = true
-  history.replaceState({ appPage: 'home' }, '')
-  activeScope = 'mine'
-  activeCategory = '全部'
-  query = ''
-  viewingMember = null
-  settingsMenuOpen = false
-  recipes = loadRecipes()
-  render()
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
-  hydrateRecipesFromIndexedDB().catch(() => null)
-  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
-  hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
-  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
-  bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
-}
-
-window.addEventListener('popstate', event => {
-  if (!appStarted) return
-  const recipeId = event.state?.recipeId
-  if (event.state?.appPage === 'detail' && recipes.some(recipe => sameId(recipe.id, recipeId))) {
-    selectedId = recipeId
-    page = 'detail'
-    render()
-    return
-  }
-  goHome(true)
-})
 
 async function checkAccess() {
   const cachedUser = loadCachedUser()
