@@ -2071,6 +2071,7 @@ function authTemplate(message = '') {
       </form>
     </details>
     <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
+    <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
     <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
 
