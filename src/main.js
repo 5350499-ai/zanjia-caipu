@@ -1936,6 +1936,8 @@ root.addEventListener('click', async event => {
 if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
 if (action === 'close-preview') { imagePreview = false; render() }
 })
+applyTheme()
+checkAccess()
 /*
 
 var recipeComments = []
