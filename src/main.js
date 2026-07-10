@@ -19,8 +19,44 @@ const RECIPE_META_STORE = 'recipe-meta'
 const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
-const APP_VERSION = 'v1.0.10'
+const APP_VERSION = 'v1.0.11'
 const THEME_KEY = 'zanjia-theme'
+
+function getSafeStorage() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null
+    const probeKey = '__zanjia_storage_probe__'
+    window.localStorage.setItem(probeKey, '1')
+    window.localStorage.removeItem(probeKey)
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function storageGet(key) {
+  try {
+    return getSafeStorage()?.getItem(key) ?? null
+  } catch {
+    return null
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    getSafeStorage()?.setItem(key, value)
+  } catch {
+    // Storage can be unavailable in private mode or damaged PWA containers.
+  }
+}
+
+function storageRemove(key) {
+  try {
+    getSafeStorage()?.removeItem(key)
+  } catch {
+    // Storage removal is best-effort; app state still resets in memory.
+  }
+}
 
 function userStorageKey() {
   return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
@@ -28,12 +64,12 @@ function userStorageKey() {
 
 function saveCachedUser(user) {
   if (!user?.id) return
-  localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user))
+  storageSet(USER_CACHE_KEY, JSON.stringify(user))
 }
 
 function loadCachedUser() {
   try {
-    const user = JSON.parse(localStorage.getItem(USER_CACHE_KEY))
+    const user = JSON.parse(storageGet(USER_CACHE_KEY))
     return user?.id ? user : null
   } catch {
     return null
@@ -46,14 +82,14 @@ function applyTheme() {
 
 function toggleTheme() {
   themeMode = themeMode === 'dark' ? 'light' : 'dark'
-  localStorage.setItem(THEME_KEY, themeMode)
+  storageSet(THEME_KEY, themeMode)
   applyTheme()
   render()
 }
 
 function loadRecipes() {
   try {
-    const saved = JSON.parse(localStorage.getItem(userStorageKey()))
+    const saved = JSON.parse(storageGet(userStorageKey()))
     if (Array.isArray(saved)) return saved.map(normalizeRecipe)
   } catch (error) {
     console.warn('本地菜谱读取失败，将使用初始数据。', error)
@@ -121,7 +157,7 @@ let currentUser = null
 let familyMemberCount = 0
 let viewingMember = null
 let settingsMenuOpen = false
-let themeMode = localStorage.getItem(THEME_KEY) || 'light'
+let themeMode = storageGet(THEME_KEY) || 'light'
 const imageObjectUrls = new Map()
 const imageRetrying = new Set()
 
@@ -255,8 +291,9 @@ function authLoadingTemplate() {
   return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p>正在打开咱家菜谱…</p></section></main>`
 }
 
-function startupFailureTemplate(message = '咱家菜谱加载失败，请点击重新加载最新版本') {
-  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p class="startup-failure-title">咱家菜谱加载失败</p><p class="startup-failure-message">${escapeHtml(message)}</p><button class="primary-button" type="button" data-action="reload-app">重新加载最新版本</button></section></main>`
+function startupFailureTemplate(error = '未知错误') {
+  const rawMessage = error?.message || error?.reason?.message || String(error || '未知错误')
+  return `<main class="auth-screen"><section class="auth-card auth-loading"><div class="auth-mark">家</div><p class="startup-failure-title">页面加载失败</p><p class="startup-failure-message">错误信息：${escapeHtml(rawMessage)}</p><button class="primary-button" type="button" data-action="reload-only">重新加载</button><button class="secondary-button" type="button" data-action="reload-app">清除缓存并重试</button></section></main>`
 }
 
 async function clearStartupShellCache() {
@@ -281,7 +318,20 @@ async function reloadLatestVersion() {
 
 function showStartupFailure(error) {
   console.error('应用启动失败。', error)
-  root.innerHTML = startupFailureTemplate()
+  const target = root || document.getElementById('root')
+  const html = startupFailureTemplate(error)
+  if (target) target.innerHTML = html
+  else document.body.innerHTML = html
+}
+
+function installGlobalErrorHandlers() {
+  window.onerror = (message, source, lineno, colno, error) => {
+    showStartupFailure(error || `${message} at ${source}:${lineno}:${colno}`)
+    return false
+  }
+  window.onunhandledrejection = event => {
+    showStartupFailure(event.reason || '未捕获 Promise 错误')
+  }
 }
 
 function recipePanelTemplate() {
@@ -502,7 +552,7 @@ async function shareCurrentUrl() {
 
 function persistRecipes() {
   const serializable = serializeRecipes()
-  localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+  storageSet(userStorageKey(), JSON.stringify(serializable))
   writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
   saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
 }
@@ -510,7 +560,7 @@ function persistRecipes() {
 async function persistSingleRecipe(recipe) {
   await saveCloudRecipe(serializeRecipes([recipe])[0])
   const serializable = serializeRecipes()
-  localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+  storageSet(userStorageKey(), JSON.stringify(serializable))
   writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
 }
 
@@ -713,7 +763,7 @@ async function clearIndexedDBCache() {
 }
 
 async function clearLocalCacheAndReload() {
-  localStorage.removeItem(userStorageKey())
+  storageRemove(userStorageKey())
   for (const objectUrl of imageObjectUrls.values()) URL.revokeObjectURL(objectUrl)
   imageObjectUrls.clear()
   await Promise.allSettled([clearIndexedDBCache(), clearCloudImageResponseCache()])
@@ -877,7 +927,7 @@ async function syncCloudLibrary({ force = false } = {}) {
     const shouldRender = force || recipesChanged(syncedRecipes)
     recipes = syncedRecipes
     const serializable = serializeRecipes()
-    localStorage.setItem(userStorageKey(), JSON.stringify(serializable))
+    storageSet(userStorageKey(), JSON.stringify(serializable))
     writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
     if (!cloudLibraryExists) await saveCloudLibrary(serializable)
     if (shouldRender) render()
@@ -1122,7 +1172,7 @@ async function deleteCurrentRecipe() {
   await Promise.allSettled(imageIds.map(item => removeStoredImage(item.id, item.version)))
   if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
   recipes = recipes.filter(recipe => !sameId(recipe.id, recipeId))
-  localStorage.setItem(userStorageKey(), JSON.stringify(serializeRecipes()))
+  storageSet(userStorageKey(), JSON.stringify(serializeRecipes()))
   selectedId = null
   draft = null
   draftDirty = false
@@ -1623,7 +1673,7 @@ async function checkAccess() {
       return startApplication()
     }
     if (cachedUser && response.ok && !result.authenticated) {
-      localStorage.removeItem(USER_CACHE_KEY)
+      storageRemove(USER_CACHE_KEY)
       appStarted = false
       currentUser = null
       recipes = []
@@ -1891,7 +1941,7 @@ root.addEventListener('click', async event => {
   if (action === 'create-member') { createMember(); return }
   if (action === 'logout') {
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
-      localStorage.removeItem(USER_CACHE_KEY)
+      storageRemove(USER_CACHE_KEY)
       appStarted = false
       selectedId = null
       currentUser = null
@@ -2348,7 +2398,7 @@ root.addEventListener('click', async event => {
     console.info('[guest] exit requested')
     settingsMenuOpen = false
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
-      localStorage.removeItem(USER_CACHE_KEY)
+      storageRemove(USER_CACHE_KEY)
       appStarted = false
       selectedId = null
       currentUser = null
@@ -2368,8 +2418,14 @@ root.addEventListener('click', async event => {
   if (action === 'save-guest-comment') { event.preventDefault(); await saveGuestComment(); return }
   if (action === 'guest-comment-clear') { guestCommentDraft = { guestName: '', content: '' }; render(); return }
   if (action === 'delete-comment' && target.dataset.commentId) { await deleteGuestComment(target.dataset.commentId); return }
+  if (action === 'reload-only') { window.location.reload(); return }
   if (action === 'reload-app') { await reloadLatestVersion(); return }
 })
 
-applyTheme()
-checkAccess()
+installGlobalErrorHandlers()
+try {
+  applyTheme()
+  checkAccess().catch(showStartupFailure)
+} catch (error) {
+  showStartupFailure(error)
+}

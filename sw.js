@@ -1,7 +1,7 @@
-const CACHE_NAME = 'family-recipes-shell-v9'
+const CACHE_NAME = 'family-recipes-shell-v10'
 const IMAGE_CACHE_NAME = 'family-recipes-image-responses-v1'
 const IMAGE_RESPONSE_LIMIT = 500
-const APP_SHELL = ['/', '/index.html?v=v1.0.10', '/manifest.json?v=v1.0.10', '/src/styles.css?v=v1.0.10', '/src/main.js?v=v1.0.10', '/src/cloud.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png']
+const APP_SHELL = ['/', '/index.html?v=v1.0.11', '/manifest.json?v=v1.0.11', '/src/styles.css?v=v1.0.11', '/src/main.js?v=v1.0.11', '/src/cloud.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)))
