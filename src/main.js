@@ -1362,60 +1362,6 @@ async function deleteCookRecord(recordId) {
   render()
 }
 
-function setupEdgeSwipeBack() {
-  const shell = document.querySelector('.detail-shell')
-  if (!shell || imageMenu || imagePreview) return
-  let tracking = false
-  let horizontal = false
-  let startX = 0
-  let startY = 0
-  let currentX = 0
-  let startedAt = 0
-
-  shell.addEventListener('touchstart', event => {
-    if (event.touches.length !== 1 || event.touches[0].clientX > 28) return
-    const touch = event.touches[0]
-    tracking = true
-    horizontal = false
-    startX = currentX = touch.clientX
-    startY = touch.clientY
-    startedAt = performance.now()
-    shell.classList.add('edge-swipe-active')
-  }, { passive: true })
-
-  shell.addEventListener('touchmove', event => {
-    if (!tracking || event.touches.length !== 1) return
-    const touch = event.touches[0]
-    const dx = Math.max(0, touch.clientX - startX)
-    const dy = touch.clientY - startY
-    if (!horizontal && Math.abs(dy) > 12 && Math.abs(dy) > dx) {
-      tracking = false
-      shell.classList.remove('edge-swipe-active')
-      return
-    }
-    if (dx > 8 && dx > Math.abs(dy) * 1.15) horizontal = true
-    if (!horizontal) return
-    event.preventDefault()
-    currentX = touch.clientX
-    shell.style.transform = `translate3d(${Math.min(dx, innerWidth)}px,0,0)`
-  }, { passive: false })
-
-  const finish = () => {
-    if (!tracking) return
-    const distance = Math.max(0, currentX - startX)
-    const velocity = distance / Math.max(1, performance.now() - startedAt)
-    const shouldReturn = horizontal && (distance > Math.min(96, innerWidth * .25) || (distance > 45 && velocity > .45))
-    tracking = false
-    shell.classList.remove('edge-swipe-active')
-    shell.style.transition = 'transform 180ms cubic-bezier(.22,.75,.25,1)'
-    shell.style.transform = shouldReturn ? `translate3d(${innerWidth}px,0,0)` : 'translate3d(0,0,0)'
-    if (shouldReturn) setTimeout(goHome, 175)
-    else setTimeout(() => { shell.style.transition = ''; shell.style.transform = '' }, 190)
-  }
-  shell.addEventListener('touchend', finish, { passive: true })
-  shell.addEventListener('touchcancel', finish, { passive: true })
-}
-
 function setupPullToRefresh() {
   const panel = document.querySelector('.recipe-panel')
   const indicator = document.querySelector('.pull-refresh-indicator')
@@ -2023,7 +1969,6 @@ function render(preserveFocus = false) {
   else root.innerHTML = homeTemplate()
   if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
   if (imagePreview) setupImagePreviewInteractions()
-  if (page === 'detail') setupEdgeSwipeBack()
   if (page === 'home') requestAnimationFrame(() => {
     centerActiveCategory()
     setupPullToRefresh()
