@@ -2314,6 +2314,7 @@ root.addEventListener('click', async event => {
   if (!target) return
   const action = target.dataset.action
   if (action === 'guest-login') {
+    console.info('[guest] button clicked')
     authBusy = true
     root.innerHTML = authTemplate()
     try {
@@ -2328,18 +2329,23 @@ root.addEventListener('click', async event => {
         root.innerHTML = authTemplate(result.error || '游客浏览失败')
         return
       }
+      console.info('[guest] session created')
       currentUser = result.user
       saveCachedUser(currentUser)
+      console.info('[guest] state saved', currentUser?.role, currentUser?.id)
       appStarted = false
       await startApplication()
+      console.info('[guest] home rendered')
     } catch (error) {
       root.innerHTML = authTemplate('游客浏览失败，请稍后重试')
+      console.error('[guest] flow failed', error)
     } finally {
       authBusy = false
     }
     return
   }
   if (action === 'guest-exit') {
+    console.info('[guest] exit requested')
     settingsMenuOpen = false
     fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
       localStorage.removeItem(USER_CACHE_KEY)
@@ -2355,6 +2361,7 @@ root.addEventListener('click', async event => {
       recipeCommentsRecipeId = null
       root.innerHTML = authTemplate()
       document.getElementById('member-code')?.focus()
+      console.info('[guest] returned to login')
     })
     return
   }
