@@ -32,6 +32,18 @@ async function ensureAdminProfile() {
   return rows?.[0] || null
 }
 
+function buildGuestProfile() {
+  return {
+    id: 'guest',
+    login_code: 'guest',
+    display_name: '游客',
+    role: 'guest',
+    family_id: FAMILY_ID,
+    pin_hash: null,
+    is_active: true,
+  }
+}
+
 module.exports = async function handler(requestMessage, response) {
   if (!hasAuthConfig()) return sendJson(response, 503, { error: '管理员密码尚未配置' })
   if (!hasDatabaseConfig()) return sendJson(response, 503, { error: 'Supabase 服务端密钥尚未配置' })
@@ -44,6 +56,12 @@ module.exports = async function handler(requestMessage, response) {
   if (requestMessage.method === 'POST') {
     const body = await readJson(requestMessage)
     const mode = body.mode || 'member'
+
+    if (mode === 'guest') {
+      const profile = buildGuestProfile()
+      response.setHeader('Set-Cookie', createSessionCookie(requestMessage, profile))
+      return sendJson(response, 200, { authenticated: true, user: publicUser(profile) })
+    }
 
     if (mode === 'admin') {
       const email = String(body.email || '').trim().toLowerCase()

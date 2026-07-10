@@ -19,7 +19,7 @@ const RECIPE_META_STORE = 'recipe-meta'
 const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
-const APP_VERSION = 'v1.0.8'
+const APP_VERSION = 'v1.0.9'
 const THEME_KEY = 'zanjia-theme'
 
 function userStorageKey() {
@@ -1935,6 +1935,398 @@ root.addEventListener('click', async event => {
   }
   if (action === 'view-image') { imageMenu = false; imagePreview = true; render(); return }
   if (action === 'close-preview') { imagePreview = false; render() }
+})
+
+var recipeComments = []
+var recipeCommentsRecipeId = null
+var recipeCommentsLoading = false
+var guestCommentBusy = false
+var guestCommentDraft = { guestName: '', content: '' }
+
+function matchScope(recipe) {
+  if (!currentUser) return true
+  if (currentUser?.role === 'guest') return Boolean(recipe.isFamilyShared)
+  if (viewingMember) return sameId(recipe.authorUserId, viewingMember.id)
+  if (activeScope === 'mine') return sameId(recipe.authorUserId, currentUser.id)
+  if (activeScope === 'shared') return Boolean(recipe.isFamilyShared)
+  return sameId(recipe.authorUserId, currentUser.id)
+}
+
+function canEditRecipe(recipe) {
+  if (currentUser?.role === 'guest') return false
+  return isAdmin() || sameId(recipe?.authorUserId, currentUser?.id)
+}
+
+function canViewRecipe(recipe) {
+  if (!recipe) return false
+  if (currentUser?.role === 'guest') return Boolean(recipe.isFamilyShared)
+  return Boolean(isAdmin() || sameId(recipe.authorUserId, currentUser?.id) || recipe.isFamilyShared)
+}
+
+function homeStats() {
+  if (currentUser?.role === 'guest') {
+    return {
+      mine: 0,
+      shared: recipes.filter(recipe => recipe.isFamilyShared).length,
+      members: 0,
+    }
+  }
+  return {
+    mine: recipes.filter(recipe => sameId(recipe.authorUserId, currentUser?.id)).length,
+    shared: recipes.filter(recipe => recipe.isFamilyShared).length,
+    members: familyMemberCount || members.length || (isAdmin() ? 1 : 0),
+  }
+}
+
+function currentAccountName() {
+  if (currentUser?.role === 'guest') return '游客'
+  return currentUser?.displayName || (isAdmin() ? '管理员' : '我')
+}
+
+function homeSubtitle() {
+  if (currentUser?.role === 'guest') return '游客浏览 · 仅查看家庭共享菜谱'
+  if (viewingMember) return `正在查看：${viewingMember.displayName}的菜谱`
+  return `${currentAccountName()}的菜谱`
+}
+
+function scopeTitle() {
+  if (viewingMember) return `${viewingMember.displayName}的菜谱`
+  if (currentUser?.role === 'guest') return '家庭共享'
+  if (activeScope === 'shared') return '家庭共享'
+  return '我的菜谱'
+}
+
+function settingsMenuTemplate() {
+  if (!settingsMenuOpen) return ''
+  const selectedRecipe = findRecipeById(selectedId)
+  if (currentUser?.role === 'guest') {
+    return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+      <button data-action="guest-exit">退出游客模式</button>
+      <button class="muted" data-action="close-settings">取消</button>
+    </div>`
+  }
+  return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+    ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
+    ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
+    <button data-action="account-info">账号信息</button>
+    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
+    <div class="app-info-panel">
+      <div class="app-info-row compact">
+        <span>当前版本</span>
+        <strong>${APP_VERSION}</strong>
+      </div>
+    </div>
+    <button data-action="clear-local-cache">清除本地缓存</button>
+    <button data-action="logout">退出登录</button>
+    <button class="muted" data-action="close-settings">取消</button>
+  </div>`
+}
+
+function globalActionsTemplate() {
+  return `<div class="global-actions" aria-label="全局操作">
+    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
+    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
+    <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
+  </div>`
+}
+
+function statsTemplate() {
+  const stats = homeStats()
+  const mineActive = !viewingMember && activeScope === 'mine'
+  const sharedActive = !viewingMember && activeScope === 'shared'
+  if (currentUser?.role === 'guest') {
+    return `<div class="home-stats guest-stats">
+      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+      <span class="stat-card disabled"><strong>游客</strong><span>仅浏览</span></span>
+    </div>`
+  }
+  return `<div class="home-stats">
+    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
+    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
+  </div>`
+}
+
+function authTemplate(message = '') {
+  return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
+    <form id="member-login-form" class="login-form">
+      <h2>家庭成员登录</h2>
+      <label for="member-code">账号编号</label>
+      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
+      <label for="member-pin">PIN / 密码</label>
+      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
+      <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
+    </form>
+    <details class="admin-login-panel">
+      <summary>管理员邮箱登录</summary>
+      <form id="admin-login-form" class="login-form">
+        <label for="admin-email">邮箱</label>
+        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
+        <label for="admin-password">密码</label>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
+        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
+      </form>
+    </details>
+    <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
+    <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
+}
+
+async function openRecipeComments(recipeId) {
+  if (!recipeId || recipeCommentsLoading) return
+  recipeCommentsLoading = true
+  try {
+    const response = await fetch(`/api/comments?recipeId=${encodeURIComponent(recipeId)}`, { credentials: 'same-origin', cache: 'no-store' })
+    if (!response.ok) throw new Error(`Failed to load comments: ${response.status}`)
+    const data = await response.json()
+    recipeCommentsRecipeId = recipeId
+    recipeComments = Array.isArray(data.comments) ? data.comments : []
+    if (page === 'detail' && sameId(selectedId, recipeId)) render()
+  } catch (error) {
+    console.warn('留言读取失败', error)
+  } finally {
+    recipeCommentsLoading = false
+  }
+}
+
+function commentsSection(recipe) {
+  const comments = recipeCommentsRecipeId === recipe.id ? recipeComments : []
+  const canWriteComment = currentUser?.role === 'guest' && recipe.isFamilyShared
+  const canDeleteComment = isAdmin() || sameId(recipe.authorUserId, currentUser?.id)
+  const list = comments.length
+    ? `<div class="comment-list">${comments.map(comment => `<article class="comment-item">
+        <div class="comment-meta"><strong>${escapeHtml(comment.guest_name || '匿名')}</strong><time>${escapeHtml((comment.created_at || '').replace('T', ' ').slice(0, 16))}</time>${canDeleteComment ? `<button class="danger-text" data-action="delete-comment" data-comment-id="${escapeHtml(comment.id)}">删除</button>` : ''}</div>
+        <p>${escapeHtml(comment.content || '')}</p>
+      </article>`).join('')}</div>`
+    : '<p class="empty-copy">还没有留言。</p>'
+  const form = canWriteComment ? `<div class="comment-form">
+    <label><span>昵称</span><input id="guest-comment-name" value="${escapeHtml(guestCommentDraft.guestName || currentUser?.displayName || '游客')}" placeholder="请输入昵称"></label>
+    <label><span>留言内容</span><textarea id="guest-comment-content" maxlength="300" placeholder="写下你想说的话">${escapeHtml(guestCommentDraft.content || '')}</textarea></label>
+    <div class="comment-form-actions"><button class="secondary-button" data-action="guest-comment-clear">清空</button><button class="primary-button" data-action="save-guest-comment" ${guestCommentBusy ? 'disabled' : ''}>提交留言</button></div>
+  </div>` : ''
+  return `<section class="recipe-section comments-section"><div class="recipe-section-title"><span>07</span><h2>留言区</h2></div><div class="recipe-section-body">${recipe.isFamilyShared ? '' : '<p class="empty-copy">仅家庭共享菜谱支持留言。</p>'}${form}${recipeCommentsRecipeId === recipe.id && recipeCommentsLoading ? '<p class="empty-copy">正在加载留言…</p>' : ''}${list}</div></section>`
+}
+
+function detailTemplate(recipe) {
+  const editable = canEditRecipe(recipe)
+  const showWritingActions = currentUser?.role !== 'guest'
+  return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
+    ${settingsMenuTemplate()}
+    <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">◌</div></div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
+      <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
+        <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能看到这道菜。' : '只有创建者和管理员可以看到。'}</small></div>
+        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
+      </div>
+      ${showWritingActions ? `<div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>` : ''}
+      ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
+      ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
+      ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
+      ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
+      ${notesSection(recipe)}
+      ${commentsSection(recipe)}
+      ${cookRecordsSection(recipe)}
+    </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
+}
+
+function render(preserveFocus = false) {
+  if (page === 'detail' && selectedId && recipeCommentsRecipeId !== selectedId && !recipeCommentsLoading) {
+    openRecipeComments(selectedId)
+  }
+  if (page === 'new' || page === 'edit') root.innerHTML = newRecipeTemplate()
+  else if (page === 'members') root.innerHTML = membersTemplate()
+  else if (page === 'detail') {
+    const recipe = findRecipeById(selectedId)
+    root.innerHTML = canViewRecipe(recipe) ? detailTemplate(recipe) : homeTemplate()
+    if (!canViewRecipe(recipe)) { page = 'home'; selectedId = null; clearRecipeComments() }
+  }
+  else root.innerHTML = homeTemplate()
+  if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
+  if (imagePreview) setupImagePreviewInteractions()
+  if (page === 'detail') setupEdgeSwipeBack()
+  if (page === 'home') requestAnimationFrame(() => {
+    centerActiveCategory()
+    setupPullToRefresh()
+    preloadHomeImages().catch(() => null)
+  })
+}
+
+async function startApplication() {
+  if (appStarted) return
+  appStarted = true
+  history.replaceState({ appPage: 'home' }, '')
+  activeScope = currentUser?.role === 'guest' ? 'shared' : 'mine'
+  activeCategory = '鍏ㄩ儴'
+  query = ''
+  viewingMember = null
+  settingsMenuOpen = false
+  clearRecipeComments()
+  recipes = loadRecipes()
+  render()
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('绂荤嚎鏈嶅姟鍚姩澶辫触銆?, error))
+  hydrateRecipesFromIndexedDB().catch(() => null)
+  hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('鏈湴鍥剧墖缂撳瓨璇诲彇澶辫触銆?, error))
+  hydrateRecipeImages(recipes, true).catch(error => console.warn('鏈湴鍥剧墖缂撳瓨璇诲彇澶辫触銆?, error))
+  if (isAdmin()) loadMembers().then(render).catch(error => console.warn('鎴愬憳鍒楄〃璇诲彇澶辫触銆?, error))
+  bootstrapCloudSync().catch(error => console.warn('鍚庡彴鍚屾鍚姩澶辫触銆?, error))
+}
+
+function openRecipe(recipeId) {
+  const viewedAt = new Date().toISOString()
+  const recipe = findRecipeById(recipeId)
+  if (!canViewRecipe(recipe)) return
+  recipes = recipes.map(item => sameId(item.id, recipeId) ? { ...item, lastViewedAt: viewedAt } : item)
+  persistRecipes()
+  selectedId = recipeId
+  page = 'detail'
+  history.pushState({ appPage: 'detail', recipeId }, '')
+  clearRecipeComments()
+  openRecipeComments(recipeId)
+  render()
+}
+
+function goHome(fromHistory = false) {
+  if (!fromHistory && history.state?.appPage === 'detail') {
+    history.back()
+    return
+  }
+  selectedId = null
+  imageMenu = false
+  imagePreview = false
+  noteEditor = null
+  settingsMenuOpen = false
+  clearRecipeComments()
+  page = 'home'
+  render()
+}
+
+function clearRecipeComments() {
+  recipeComments = []
+  recipeCommentsRecipeId = null
+  recipeCommentsLoading = false
+  guestCommentBusy = false
+  guestCommentDraft = { guestName: '', content: '' }
+}
+
+async function saveGuestComment() {
+  const recipe = findRecipeById(selectedId)
+  if (!recipe || currentUser?.role !== 'guest' || !recipe.isFamilyShared) return
+  const guestName = String(document.getElementById('guest-comment-name')?.value || '').trim()
+  const content = String(document.getElementById('guest-comment-content')?.value || '').trim()
+  if (!guestName || !content) {
+    window.alert('昵称和留言不能为空')
+    return
+  }
+  if (content.length > 300) {
+    window.alert('留言最多 300 字')
+    return
+  }
+  guestCommentBusy = true
+  guestCommentDraft = { guestName, content }
+  render()
+  try {
+    const response = await fetch(`/api/comments?recipeId=${encodeURIComponent(recipe.id)}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestName, content }),
+    })
+    const result = await response.json()
+    if (!response.ok) {
+      window.alert(result.error || '留言提交失败')
+      return
+    }
+    guestCommentDraft = { guestName: '', content: '' }
+    await openRecipeComments(recipe.id)
+    render()
+  } catch (error) {
+    window.alert('留言提交失败，请稍后重试')
+  } finally {
+    guestCommentBusy = false
+    render()
+  }
+}
+
+async function deleteGuestComment(commentId) {
+  const recipe = findRecipeById(selectedId)
+  if (!recipe || !commentId) return
+  if (!window.confirm('确定要删除这条留言吗？')) return
+  const response = await fetch(`/api/comments?recipeId=${encodeURIComponent(recipe.id)}&id=${encodeURIComponent(commentId)}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    window.alert(result.error || '留言删除失败')
+    return
+  }
+  await openRecipeComments(recipe.id)
+  render()
+}
+
+function normalizeGuestCommentDraft() {
+  guestCommentDraft = {
+    guestName: document.getElementById('guest-comment-name')?.value || guestCommentDraft.guestName || '',
+    content: document.getElementById('guest-comment-content')?.value || guestCommentDraft.content || '',
+  }
+}
+
+root.addEventListener('input', event => {
+  if (event.target.id === 'guest-comment-name' || event.target.id === 'guest-comment-content') normalizeGuestCommentDraft()
+})
+
+root.addEventListener('click', async event => {
+  const target = event.target instanceof Element ? event.target.closest('[data-action]') : null
+  if (!target) return
+  const action = target.dataset.action
+  if (action === 'guest-login') {
+    authBusy = true
+    root.innerHTML = authTemplate()
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'guest' }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        root.innerHTML = authTemplate(result.error || '游客浏览失败')
+        return
+      }
+      currentUser = result.user
+      saveCachedUser(currentUser)
+      appStarted = false
+      await startApplication()
+    } catch (error) {
+      root.innerHTML = authTemplate('游客浏览失败，请稍后重试')
+    } finally {
+      authBusy = false
+    }
+    return
+  }
+  if (action === 'guest-exit') {
+    settingsMenuOpen = false
+    fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }).finally(() => {
+      localStorage.removeItem(USER_CACHE_KEY)
+      appStarted = false
+      selectedId = null
+      currentUser = null
+      viewingMember = null
+      settingsMenuOpen = false
+      recipes = []
+      members = []
+      page = 'home'
+      recipeComments = []
+      recipeCommentsRecipeId = null
+      root.innerHTML = authTemplate()
+      document.getElementById('member-code')?.focus()
+    })
+    return
+  }
+  if (action === 'save-guest-comment') { event.preventDefault(); await saveGuestComment(); return }
+  if (action === 'guest-comment-clear') { guestCommentDraft = { guestName: '', content: '' }; render(); return }
+  if (action === 'delete-comment' && target.dataset.commentId) { await deleteGuestComment(target.dataset.commentId); return }
 })
 
 applyTheme()

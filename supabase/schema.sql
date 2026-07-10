@@ -78,3 +78,18 @@ create index if not exists recipes_shared_idx on public.recipes (family_id, is_f
 create index if not exists recipes_image_idx on public.recipes (image_id);
 create index if not exists recipes_last_cooked_idx on public.recipes (family_id, last_cooked_at desc);
 create index if not exists recipes_cook_count_idx on public.recipes (family_id, cook_count desc);
+
+create table if not exists public.guest_comments (
+  id uuid primary key default gen_random_uuid(),
+  recipe_id text not null references public.recipes(id) on delete cascade,
+  guest_name text not null,
+  content text not null,
+  created_at timestamptz not null default now(),
+  ip_hash text,
+  user_agent_hash text
+);
+
+alter table public.guest_comments enable row level security;
+revoke all on public.guest_comments from anon, authenticated;
+
+create index if not exists guest_comments_recipe_idx on public.guest_comments (recipe_id, created_at desc);

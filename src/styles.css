@@ -737,3 +737,317 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
     font-size: 13px;
   }
 }
+
+:root {
+  --bg: #e8e6e1;
+  --card: #fffdf9;
+  --text: #25221e;
+  --text-muted: #80786f;
+  --border: #e6ddd2;
+  --primary: #9c4b3d;
+  --primary-text: #fffaf6;
+  --input-bg: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --bg: #171310;
+  --card: #2a241f;
+  --text: #f5f1ea;
+  --text-muted: #b8aea2;
+  --border: #4a4038;
+  --primary: #b15b4d;
+  --primary-text: #fff8f0;
+  --input-bg: #2a241f;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell,
+.home-header,
+.detail-header,
+.form-bottom-actions {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settings-popover,
+.recipe-card,
+.form-section,
+.detail-accordion,
+.cook-record,
+.comment-item,
+.comment-form,
+.confirm-dialog,
+.app-info-panel,
+.share-status-card {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.home-header,
+.detail-header,
+.search-box,
+.form-control,
+.settings-popover,
+.form-section,
+.detail-accordion,
+.recipe-card,
+.cook-record,
+.comment-item,
+.confirm-dialog,
+.app-info-panel,
+.share-status-card,
+.ingredient-list,
+.steps li {
+  border-color: var(--border);
+}
+
+.home-header,
+.detail-header,
+.settings-popover,
+.search-box,
+.form-control,
+.note-editor textarea,
+.comment-form input,
+.comment-form textarea,
+.confirm-dialog,
+.app-info-panel,
+.detail-accordion,
+.form-section {
+  color: var(--text);
+}
+
+.account-subtitle,
+.recipe-count,
+.empty-copy,
+.app-info-row span,
+.settings-popover .muted,
+.note time,
+.pull-refresh-indicator,
+.recipe-author-line,
+.share-status-card small,
+.comment-meta time {
+  color: var(--text-muted);
+}
+
+.brand-row h1,
+.list-heading h2,
+.detail-title-row h1,
+.recipe-section-title h2,
+.card-content h3,
+.detail-accordion summary h2,
+.app-info-row strong {
+  color: var(--text);
+}
+
+.global-icon-button,
+.settings-button,
+.secondary-mini-button,
+.settings-popover button,
+.secondary-button,
+.confirm-actions .continue {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--card);
+}
+
+.global-icon-button {
+  box-shadow: 0 2px 10px rgba(28, 20, 13, .06);
+}
+
+.primary-button,
+.confirm-actions .save,
+.form-bottom-actions .primary-button,
+.notes-toolbar button,
+.guest-login-button {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.recipe-card .image-area.placeholder,
+.form-photo.placeholder {
+  background: color-mix(in srgb, var(--card) 92%, var(--bg));
+  color: var(--text-muted);
+}
+
+.placeholder-plus {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+}
+
+.search-box,
+.form-control,
+.note-editor textarea,
+.comment-form input,
+.comment-form textarea {
+  background: var(--input-bg);
+}
+
+.detail-accordion summary i {
+  border-right-color: var(--text-muted);
+  border-bottom-color: var(--text-muted);
+}
+
+.ingredient-list,
+.steps li,
+.note,
+.comment-item,
+.cook-record {
+  background: var(--card);
+}
+
+.steps li > span,
+.note::before {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.comment-list,
+.note-list,
+.cook-record-list {
+  color: var(--text);
+}
+
+.comment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-item {
+  padding: 12px 13px 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 3px 14px rgba(30, 22, 14, .04);
+}
+
+.comment-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.comment-meta strong {
+  font-size: 14px;
+}
+
+.comment-item p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.comment-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.comment-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.comment-form label span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comment-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 8px;
+}
+
+.guest-login-button {
+  width: 100%;
+  height: 52px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+/* Dark theme polish for structural surfaces */
+:root[data-theme="dark"] .home-header,
+:root[data-theme="dark"] .detail-header,
+:root[data-theme="dark"] .form-bottom-actions {
+  background: color-mix(in srgb, var(--bg) 88%, black);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .settings-popover,
+:root[data-theme="dark"] .recipe-card,
+:root[data-theme="dark"] .form-section,
+:root[data-theme="dark"] .detail-accordion,
+:root[data-theme="dark"] .cook-record,
+:root[data-theme="dark"] .comment-item,
+:root[data-theme="dark"] .comment-form,
+:root[data-theme="dark"] .confirm-dialog,
+:root[data-theme="dark"] .app-info-panel,
+:root[data-theme="dark"] .share-status-card {
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+}
+
+:root[data-theme="dark"] .search-box,
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .note-editor textarea,
+:root[data-theme="dark"] .comment-form input,
+:root[data-theme="dark"] .comment-form textarea {
+  background: var(--input-bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .recipe-section,
+:root[data-theme="dark"] .recipe-section-title,
+:root[data-theme="dark"] .recipe-section-body,
+:root[data-theme="dark"] .steps p,
+:root[data-theme="dark"] .body-copy,
+:root[data-theme="dark"] .simple-list li,
+:root[data-theme="dark"] .note p,
+:root[data-theme="dark"] .comment-item p,
+:root[data-theme="dark"] .cook-record p {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .empty-copy,
+:root[data-theme="dark"] .account-subtitle,
+:root[data-theme="dark"] .recipe-count,
+:root[data-theme="dark"] .app-info-row span,
+:root[data-theme="dark"] .settings-popover .muted,
+:root[data-theme="dark"] .pull-refresh-indicator,
+:root[data-theme="dark"] .recipe-author-line,
+:root[data-theme="dark"] .share-status-card small,
+:root[data-theme="dark"] .comment-meta time,
+:root[data-theme="dark"] .note time {
+  color: var(--text-muted);
+}
+
+:root[data-theme="dark"] .global-icon-button,
+:root[data-theme="dark"] .settings-button,
+:root[data-theme="dark"] .secondary-mini-button,
+:root[data-theme="dark"] .settings-popover button,
+:root[data-theme="dark"] .secondary-button,
+:root[data-theme="dark"] .confirm-actions .continue {
+  background: color-mix(in srgb, var(--card) 92%, var(--bg));
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .settings-popover button:active {
+  background: color-mix(in srgb, var(--card) 84%, var(--bg));
+}

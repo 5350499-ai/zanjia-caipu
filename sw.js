@@ -1,4 +1,4 @@
-const CACHE_NAME = 'family-recipes-shell-v6'
+const CACHE_NAME = 'family-recipes-shell-v7'
 const IMAGE_CACHE_NAME = 'family-recipes-image-responses-v1'
 const IMAGE_RESPONSE_LIMIT = 500
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/src/styles.css', '/src/main.js', '/src/cloud.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon-180.png']

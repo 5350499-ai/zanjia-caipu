@@ -63,7 +63,9 @@ function toRow(recipe, user, existing = null) {
 async function loadVisibleRecipes(user) {
   const select = 'id,name,categories,ingredients,seasonings,steps,tips,notes,tags,favorite_user_ids,cook_records,cook_count,last_cooked_at,image_id,image_version,author_user_id,author_name,family_id,is_family_shared,created_by_role,last_viewed_at,created_at,modified_at'
   let query = `?family_id=eq.${encodeFilter(user.familyId)}&select=${select}&order=last_viewed_at.desc.nullslast&order=created_at.desc`
-  if (user.role !== 'admin') {
+  if (user.role === 'guest') {
+    query += `&is_family_shared=eq.true`
+  } else if (user.role !== 'admin') {
     query += `&or=(author_user_id.eq.${encodeFilter(user.id)},is_family_shared.eq.true)`
   }
   const rows = await request('/rest/v1/recipes', { query })
@@ -71,6 +73,7 @@ async function loadVisibleRecipes(user) {
 }
 
 async function loadFamilyStats(user) {
+  if (user.role === 'guest') return { memberCount: 0 }
   const members = await request('/rest/v1/family_profiles', {
     query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id`,
   })
@@ -85,7 +88,7 @@ async function findRecipe(id) {
 }
 
 function canEdit(user, row) {
-  return user.role === 'admin' || row.author_user_id === user.id
+  return user.role === 'admin' || (user.role !== 'guest' && row.author_user_id === user.id)
 }
 
 module.exports = async function handler(requestMessage, response) {
@@ -98,9 +101,13 @@ module.exports = async function handler(requestMessage, response) {
     return sendJson(response, 200, { recipes, stats })
   }
 
+  if (user.role === 'guest') {
+    return sendJson(response, 403, { error: 'Guest users cannot modify recipes' })
+  }
+
   if (requestMessage.method === 'POST') {
     const { recipe } = await readJson(requestMessage)
-    if (!recipe?.id || !recipe?.name) return sendJson(response, 400, { error: '菜谱信息不完整' })
+    if (!recipe?.id || !recipe?.name) return sendJson(response, 400, { error: 'Recipe payload is incomplete' })
     const existing = await findRecipe(recipe.id)
     if (existing && !canEdit(user, existing)) return sendJson(response, 403, { error: '没有权限修改这个菜谱' })
     const row = toRow(recipe, user, existing)
@@ -115,7 +122,7 @@ module.exports = async function handler(requestMessage, response) {
   if (requestMessage.method === 'DELETE') {
     const id = new URL(requestMessage.url, 'http://local').searchParams.get('id')
     const existing = id ? await findRecipe(id) : null
-    if (!existing) return sendJson(response, 404, { error: '菜谱不存在' })
+    if (!existing) return sendJson(response, 404, { error: 'Recipe not found' })
     if (!canEdit(user, existing)) return sendJson(response, 403, { error: '没有权限删除这个菜谱' })
     await request('/rest/v1/recipes', {
       method: 'DELETE',
