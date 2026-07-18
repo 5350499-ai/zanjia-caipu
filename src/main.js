@@ -1,4 +1,5 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
 const selectableCategories = categories.slice(1)
@@ -16,10 +17,10 @@ const IMAGE_DB_NAME = 'family-recipes-images'
 const IMAGE_STORE = 'images'
 const IMAGE_META_STORE = 'image-meta'
 const RECIPE_META_STORE = 'recipe-meta'
-const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024
 const HOME_PRELOAD_LIMIT = 20
 const USER_CACHE_KEY = 'family-recipes-last-user'
-const APP_VERSION = 'v1.0.11'
+const OPEN_ORDER_KEY = 'family-recipes-open-order'
+const APP_VERSION = 'v1.0.14'
 const THEME_KEY = 'zanjia-theme'
 
 function getSafeStorage() {
@@ -60,6 +61,26 @@ function storageRemove(key) {
 
 function userStorageKey() {
   return currentUser?.id ? `${STORAGE_KEY}:${currentUser.id}` : STORAGE_KEY
+}
+
+function userOpenOrderKey() {
+  return currentUser?.id ? `${OPEN_ORDER_KEY}:${currentUser.id}` : OPEN_ORDER_KEY
+}
+
+function loadOpenOrder() {
+  try {
+    const value = JSON.parse(storageGet(userOpenOrderKey()) || '{}')
+    return value && typeof value === 'object' ? value : {}
+  } catch {
+    return {}
+  }
+}
+
+function touchRecipeOpen(recipeId) {
+  const order = loadOpenOrder()
+  const nextSequence = Object.values(order).reduce((max, value) => Math.max(max, Number(value) || 0), 0) + 1
+  order[String(recipeId)] = nextSequence
+  storageSet(userOpenOrderKey(), JSON.stringify(order))
 }
 
 function saveCachedUser(user) {
@@ -154,12 +175,20 @@ let cloudReady = false
 let refreshing = false
 let preloadingImages = false
 let currentUser = null
+let sessionWatchStarted = false
 let familyMemberCount = 0
 let viewingMember = null
 let settingsMenuOpen = false
 let themeMode = storageGet(THEME_KEY) || 'light'
 const imageObjectUrls = new Map()
 const imageRetrying = new Set()
+const imageLoadPromises = new Map()
+
+function syncMenuScrollLock() {
+  const locked = Boolean(settingsMenuOpen)
+  document.documentElement.classList.toggle('menu-open', locked)
+  document.body.classList.toggle('menu-open', locked)
+}
 
 const icons = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -182,6 +211,7 @@ function imageArea(recipe, compact = false) {
 
 function getFilteredRecipes() {
   const keyword = query.trim().toLowerCase()
+  const openOrder = loadOpenOrder()
   return recipes.filter(recipe => {
     const scopeMatch = matchScope(recipe)
     const categoryMatch = activeCategory === '全部' || recipe.categories.includes(activeCategory)
@@ -198,8 +228,8 @@ function getFilteredRecipes() {
   }).sort((a, b) => {
     if (activeScope === 'recentCooked') return String(b.lastCookedAt || '').localeCompare(String(a.lastCookedAt || ''))
     if (activeScope === 'mostCooked') return Number(b.cookCount || 0) - Number(a.cookCount || 0)
-    const recent = String(b.lastViewedAt || '').localeCompare(String(a.lastViewedAt || ''))
-    if (recent) return recent
+    const opened = Number(openOrder[String(b.id)] || 0) - Number(openOrder[String(a.id)] || 0)
+    if (opened) return opened
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
   })
 }
@@ -562,7 +592,6 @@ async function storeImage(imageId, file, version = '') {
     transaction.oncomplete = async () => {
       database.close()
       await writeImageMeta(cacheKey, file).catch(error => console.warn('图片缓存元数据写入失败。', error))
-      pruneImageCache().catch(error => console.warn('图片缓存清理失败。', error))
       resolve()
     }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
@@ -641,9 +670,11 @@ async function clearIndexedDBCache() {
 
 async function clearLocalCacheAndReload() {
   storageRemove(userStorageKey())
+  storageRemove(userOpenOrderKey())
   for (const objectUrl of imageObjectUrls.values()) URL.revokeObjectURL(objectUrl)
   imageObjectUrls.clear()
-  await Promise.allSettled([clearIndexedDBCache(), clearCloudImageResponseCache()])
+  imageLoadPromises.clear()
+  await Promise.allSettled([clearIndexedDBCache(), clearCloudImageResponseCache(), clearCloudStaticResponseCache()])
   recipes = []
   render()
   if (!cloudReady) cloudReady = await initCloud()
@@ -690,18 +721,6 @@ async function listImageMeta() {
   })
 }
 
-async function pruneImageCache() {
-  const items = await listImageMeta()
-  let total = items.reduce((sum, item) => sum + Number(item.size || 0), 0)
-  if (total <= IMAGE_CACHE_LIMIT) return
-  const removable = items.sort((a, b) => Number(a.lastAccessed || 0) - Number(b.lastAccessed || 0))
-  for (const item of removable) {
-    if (total <= IMAGE_CACHE_LIMIT) break
-    await removeStoredImage(item.key)
-    total -= Number(item.size || 0)
-  }
-}
-
 async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true) {
   await Promise.all(targetRecipes.map(async recipe => {
     try {
@@ -743,28 +762,38 @@ async function cacheRecipeImage(recipe) {
   if (!recipe || !cloudReady) return false
   let changed = false
   if (recipe.imageId && !recipe.image) {
-    const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
-    if (cached) setRecipeImageFromBlob(recipe, cached)
-    else {
-      const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
-      if (blob) {
-        await storeImage(recipe.imageId, blob, recipe.imageVersion)
-        setRecipeImageFromBlob(recipe, blob)
-      }
+    const cacheKey = recipeImageCacheKey(recipe)
+    let load = imageLoadPromises.get(cacheKey)
+    if (!load) {
+      load = (async () => {
+        const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
+        if (cached) return cached
+        const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
+        if (blob) await storeImage(recipe.imageId, blob, recipe.imageVersion)
+        return blob
+      })().finally(() => imageLoadPromises.delete(cacheKey))
+      imageLoadPromises.set(cacheKey, load)
     }
+    const blob = await load
+    if (blob) setRecipeImageFromBlob(recipe, blob)
     changed = true
   }
   for (const record of (recipe.cookRecords || [])) {
     if (!record.imageId || record.image) continue
-    const cached = await readImage(record.imageId, record.imageVersion).catch(() => null)
-    if (cached) setRecordImageFromBlob(record, cached)
-    else {
-      const blob = await downloadCloudImage(record.imageId, record.imageVersion)
-      if (blob) {
-        await storeImage(record.imageId, blob, record.imageVersion)
-        setRecordImageFromBlob(record, blob)
-      }
+    const cacheKey = recipeImageCacheKey(record.imageId, record.imageVersion)
+    let load = imageLoadPromises.get(cacheKey)
+    if (!load) {
+      load = (async () => {
+        const cached = await readImage(record.imageId, record.imageVersion).catch(() => null)
+        if (cached) return cached
+        const blob = await downloadCloudImage(record.imageId, record.imageVersion)
+        if (blob) await storeImage(record.imageId, blob, record.imageVersion)
+        return blob
+      })().finally(() => imageLoadPromises.delete(cacheKey))
+      imageLoadPromises.set(cacheKey, load)
     }
+    const blob = await load
+    if (blob) setRecordImageFromBlob(record, blob)
     changed = true
   }
   return changed
@@ -1022,6 +1051,7 @@ async function saveRecipe() {
     await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
     if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
   }
+  if (!isEditing) touchRecipeOpen(id)
   activeCategory = '全部'
   query = ''
   page = isEditing ? 'detail' : 'home'
@@ -1419,12 +1449,13 @@ async function checkAccess() {
       saveCachedUser(currentUser)
       return startApplication()
     }
-    if (cachedUser && response.ok && !result.authenticated) {
+    if (cachedUser && response.status === 401 && result.reason === 'session_expired') {
       storageRemove(USER_CACHE_KEY)
       appStarted = false
       currentUser = null
       recipes = []
     }
+    if (cachedUser && response.status !== 401) return
     root.innerHTML = authTemplate(response.status === 503 ? result.error : '')
   } catch {
     if (cachedUser) {
@@ -1587,6 +1618,12 @@ root.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) return
   const action = target.dataset.action
+  if (target.classList.contains('settings-layer') && event.target instanceof Element && event.target.closest('.settings-popover')) return
+  if (action && target.closest('.settings-popover') && action !== 'close-settings') {
+    settingsMenuOpen = false
+    render()
+    initSupabaseSessionBridge().catch(() => null)
+  }
   if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
   if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
@@ -1662,6 +1699,22 @@ root.addEventListener('click', async event => {
   }
   if (action === 'stop-view-member') { viewingMember = null; activeScope = 'mine'; activeCategory = '全部'; query = ''; render(); return }
   if (action === 'members') { settingsMenuOpen = false; openMembersPage(); return }
+  if (action === 'storage-stats') {
+    settingsMenuOpen = false
+    try {
+      const stats = await loadCloudStorageStats()
+      const size = stats.totalBytes >= 1024 * 1024
+        ? `${(stats.totalBytes / 1024 / 1024).toFixed(2)} MB`
+        : `${(stats.totalBytes / 1024).toFixed(1)} KB`
+      const capacity = stats.capacityBytes > 0 ? `\n配置容量：${(stats.capacityBytes / 1024 / 1024).toFixed(0)} MB` : '\n配置容量：未配置'
+      const warning = stats.usageRatio >= 0.7 ? '\n⚠️ 已达到容量的 70%，请安排清理或扩容。' : ''
+      window.alert(`Supabase Storage 统计\n图片数量：${stats.imageCount}\n当前图片总容量：${size}${capacity}\n扫描对象：${stats.scanned}${warning}`)
+    } catch {
+      window.alert('Storage 统计读取失败，请稍后重试。')
+    }
+    render()
+    return
+  }
   if (action === 'cleanup-images') {
     settingsMenuOpen = false
     try {
@@ -1727,7 +1780,11 @@ root.addEventListener('click', async event => {
     return
   }
   if (action === 'clear') { query = ''; const search = document.getElementById('search'); if (search) { search.value = ''; search.focus() } updateSearchResults(); return }
-  if (action === 'back-home') { goHome(); return }
+  if (action === 'back-home') {
+    if (settingsMenuOpen) { settingsMenuOpen = false; render(); return }
+    goHome()
+    return
+  }
   if (action === 'add-image' && page === 'detail') {
     if (!canEditRecipe(findRecipeById(selectedId))) return
     document.getElementById('file-input')?.click()
@@ -1826,16 +1883,16 @@ function settingsMenuTemplate() {
   if (!settingsMenuOpen) return ''
   const selectedRecipe = findRecipeById(selectedId)
   if (currentUser?.role === 'guest') {
-    return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+    return `<div class="settings-layer" data-action="close-settings"><div class="settings-popover" role="dialog" aria-label="设置菜单">
       <button data-action="guest-exit">退出游客模式</button>
       <button class="muted" data-action="close-settings">取消</button>
-    </div>`
+    </div></div>`
   }
-  return `<div class="settings-popover" role="dialog" aria-label="设置菜单">
+  return `<div class="settings-layer" data-action="close-settings"><div class="settings-popover" role="dialog" aria-label="设置菜单">
     ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
     ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
     <button data-action="account-info">账号信息</button>
-    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
+    ${isAdmin() ? '<button data-action="members">成员管理</button><button data-action="storage-stats">Storage 统计</button><button data-action="cleanup-images">清理图片垃圾</button>' : ''}
     <div class="app-info-panel">
       <div class="app-info-row compact">
         <span>当前版本</span>
@@ -1845,7 +1902,7 @@ function settingsMenuTemplate() {
     <button data-action="clear-local-cache">清除本地缓存</button>
     <button data-action="logout">退出登录</button>
     <button class="muted" data-action="close-settings">取消</button>
-  </div>`
+  </div></div>`
 }
 
 function globalActionsTemplate() {
@@ -1956,6 +2013,7 @@ function detailTemplate(recipe) {
 }
 
 function render(preserveFocus = false) {
+  syncMenuScrollLock()
   if (page === 'detail' && selectedId && recipeCommentsRecipeId !== selectedId && !recipeCommentsLoading) {
     openRecipeComments(selectedId)
   }
@@ -1980,6 +2038,7 @@ async function startApplication() {
   if (appStarted) return
   try {
     appStarted = true
+    startSessionWatch()
     history.replaceState({ appPage: 'home' }, '')
     activeScope = currentUser?.role === 'guest' ? 'shared' : 'mine'
     activeCategory = '全部'
@@ -1992,7 +2051,6 @@ async function startApplication() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
     hydrateRecipesFromIndexedDB().catch(() => null)
     hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
-    hydrateRecipeImages(recipes, true).catch(error => console.warn('本地图片缓存读取失败。', error))
     if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
     bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
   } catch (error) {
@@ -2001,12 +2059,43 @@ async function startApplication() {
   }
 }
 
+async function revalidateSession() {
+  if (!currentUser) return
+  try {
+    const response = await fetch('/api/auth', { cache: 'no-store', credentials: 'same-origin' })
+    const result = await response.json().catch(() => ({}))
+    if (response.ok && result.authenticated && result.user) {
+      currentUser = result.user
+      saveCachedUser(currentUser)
+      return
+    }
+    // Only the explicit expiry response may end an existing cached session.
+    if (response.status === 401 && result.reason === 'session_expired') {
+      storageRemove(USER_CACHE_KEY)
+      currentUser = null
+      appStarted = false
+      recipes = []
+      root.innerHTML = authTemplate('登录已过期，请重新登录')
+    }
+  } catch {
+    // Offline/transient errors must never clear a valid UI session.
+  }
+}
+
+function startSessionWatch() {
+  if (sessionWatchStarted || typeof window === 'undefined') return
+  sessionWatchStarted = true
+  window.addEventListener('online', () => revalidateSession())
+  window.addEventListener('focus', () => revalidateSession())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') revalidateSession()
+  })
+}
+
 function openRecipe(recipeId) {
-  const viewedAt = new Date().toISOString()
   const recipe = findRecipeById(recipeId)
   if (!canViewRecipe(recipe)) return
-  recipes = recipes.map(item => sameId(item.id, recipeId) ? { ...item, lastViewedAt: viewedAt } : item)
-  persistRecipes()
+  touchRecipeOpen(recipeId)
   selectedId = recipeId
   page = 'detail'
   history.pushState({ appPage: 'detail', recipeId }, '')
@@ -2166,6 +2255,22 @@ root.addEventListener('click', async event => {
   if (action === 'delete-comment' && target.dataset.commentId) { await deleteGuestComment(target.dataset.commentId); return }
   if (action === 'reload-only') { window.location.reload(); return }
   if (action === 'reload-app') { await reloadLatestVersion(); return }
+})
+
+window.addEventListener('popstate', event => {
+  if (settingsMenuOpen) {
+    settingsMenuOpen = false
+    render()
+    history.pushState({ appPage: page, recipeId: selectedId }, '')
+    return
+  }
+  if (event.state?.appPage === 'detail' && event.state.recipeId) {
+    selectedId = event.state.recipeId
+    page = 'detail'
+    render()
+    return
+  }
+  goHome(true)
 })
 
 installGlobalErrorHandlers()

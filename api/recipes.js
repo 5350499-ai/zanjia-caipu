@@ -62,7 +62,8 @@ function toRow(recipe, user, existing = null) {
 
 async function loadVisibleRecipes(user) {
   const select = 'id,name,categories,ingredients,seasonings,steps,tips,notes,tags,favorite_user_ids,cook_records,cook_count,last_cooked_at,image_id,image_version,author_user_id,author_name,family_id,is_family_shared,created_by_role,last_viewed_at,created_at,modified_at'
-  let query = `?family_id=eq.${encodeFilter(user.familyId)}&select=${select}&order=last_viewed_at.desc.nullslast&order=created_at.desc`
+  // UI sorting is per-device and per-user; do not use the legacy global last_viewed_at field.
+  let query = `?family_id=eq.${encodeFilter(user.familyId)}&select=${select}&order=created_at.desc`
   if (user.role === 'guest') {
     query += `&is_family_shared=eq.true`
   } else if (user.role !== 'admin') {

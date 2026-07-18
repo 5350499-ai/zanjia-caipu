@@ -87,6 +87,20 @@ export async function clearCloudImageResponseCache() {
   return caches.delete('family-recipes-image-responses-v1')
 }
 
+export async function clearCloudStaticResponseCache() {
+  if (typeof caches === 'undefined') return false
+  const imageCache = 'family-recipes-image-responses-v1'
+  const keys = await caches.keys()
+  await Promise.all(keys.filter(key => key !== imageCache).map(key => caches.delete(key)))
+  return true
+}
+
+export async function loadCloudStorageStats() {
+  const response = await fetch('/api/images?action=stats', { credentials: 'same-origin', cache: 'no-store' })
+  if (!response.ok) throw new Error(`Storage stats failed: ${response.status}`)
+  return response.json()
+}
+
 async function openImageResponseCache() {
   if (typeof caches === 'undefined') return null
   try {

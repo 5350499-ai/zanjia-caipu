@@ -50,7 +50,14 @@ module.exports = async function handler(requestMessage, response) {
 
   if (requestMessage.method === 'GET') {
     const user = getSessionUser(requestMessage)
-    return sendJson(response, 200, { authenticated: Boolean(user), user: publicUser(user) })
+    if (!user) {
+      // Only an invalid/missing signed cookie is a confirmed session end.
+      // The frontend keeps its cached session for network/5xx failures.
+      return sendJson(response, 401, { authenticated: false, reason: 'session_expired', user: null })
+    }
+    // Roll the expiry window forward after every successful verification.
+    response.setHeader('Set-Cookie', createSessionCookie(requestMessage, user))
+    return sendJson(response, 200, { authenticated: true, user: publicUser(user) })
   }
 
   if (requestMessage.method === 'POST') {

@@ -1,6 +1,6 @@
 const { request } = require('../lib/supabase-server')
 const { getSessionUser, readBuffer, sendJson } = require('../lib/server-auth')
-const { downloadStorageImage, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
+const { downloadStorageImage, listStorageImageDetails, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
 
 async function findImageRecipe(imageId) {
   const rows = await request('/rest/v1/recipes', {
@@ -100,6 +100,24 @@ async function diagnoseImages(user) {
   }
 }
 
+async function storageStats(user) {
+  if (user.role !== 'admin') return { status: 403, body: { error: '只有管理员可以查看 Storage 统计' } }
+  const objects = await listStorageImageDetails()
+  const totalBytes = objects.reduce((sum, item) => sum + Number(item.metadata?.size || item.size || 0), 0)
+  const capacityBytes = Number(process.env.SUPABASE_STORAGE_CAPACITY_BYTES || 0)
+  return {
+    status: 200,
+    body: {
+      imageCount: objects.length,
+      totalBytes,
+      capacityBytes,
+      usageRatio: capacityBytes > 0 ? totalBytes / capacityBytes : null,
+      scanned: objects.length,
+      source: 'Supabase Storage recipe-images bucket',
+    },
+  }
+}
+
 module.exports = async function handler(requestMessage, response) {
   const user = getSessionUser(requestMessage)
   if (!user) return sendJson(response, 401, { error: 'Unauthorized' })
@@ -120,6 +138,15 @@ module.exports = async function handler(requestMessage, response) {
       return sendJson(response, 405, { error: 'Method not allowed' })
     }
     const result = await diagnoseImages(user)
+    return sendJson(response, result.status, result.body)
+  }
+
+  if (url.searchParams.get('action') === 'stats') {
+    if (requestMessage.method !== 'GET') {
+      response.setHeader('Allow', 'GET')
+      return sendJson(response, 405, { error: 'Method not allowed' })
+    }
+    const result = await storageStats(user)
     return sendJson(response, result.status, result.body)
   }
 
