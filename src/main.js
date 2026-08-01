@@ -162,6 +162,10 @@ let memberDraft = { loginCode: '', displayName: '', pin: '' }
 let imageMenu = false
 let draft = null
 let draftDirty = false
+let draftGeneration = 0
+let draftBusy = false
+let draftImageBusy = false
+let recipeImageBusy = false
 let formExitPrompt = false
 let deleteRecipePrompt = false
 let searchIsComposing = false
@@ -300,19 +304,26 @@ function showStartupFailure(error) {
 
 function installGlobalErrorHandlers() {
   window.onerror = (message, source, lineno, colno, error) => {
-    showStartupFailure(error || `${message} at ${source}:${lineno}:${colno}`)
+    if (!appStarted) showStartupFailure(error || `${message} at ${source}:${lineno}:${colno}`)
+    else console.error('Runtime error', error || message, { source, lineno, colno })
     return false
   }
   window.onunhandledrejection = event => {
+    if (appStarted) {
+      console.error('Unhandled Promise rejection', event.reason)
+      return
+    }
     showStartupFailure(event.reason || '未捕获 Promise 错误')
   }
 }
 
 function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
+  const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
+  const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
   return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : scopeTitle()}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
     ${filtered.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
-    ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>没有找到相关菜谱</h3><p>换个菜名或材料试试</p></div>`}</div>`
+    ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
 }
 
 function homeTemplate() {
@@ -368,7 +379,7 @@ function newRecipeTemplate() {
     ${settingsMenuTemplate()}
     <main class="recipe-form">
       <section class="form-section photo-section"><div class="form-label"><strong>成品照片</strong><span>可选</span></div>
-        ${draft.image ? `<button class="form-photo has-image" data-action="choose-draft-image"><img src="${draft.image}" alt="待保存的菜谱图片"><span>更换图片</span></button><button class="remove-form-photo" data-action="remove-draft-image">删除图片</button>` : `<button class="form-photo placeholder" data-action="choose-draft-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>建议使用横向 4:3 照片</small></button>`}
+        ${draft.image ? `<button class="form-photo has-image" data-action="choose-draft-image" ${draftImageBusy || draftBusy ? 'disabled' : ''}><img src="${draft.image}" alt="待保存的菜谱图片"><span>更换图片</span></button><button class="remove-form-photo" data-action="remove-draft-image" ${draftImageBusy || draftBusy ? 'disabled' : ''}>删除图片</button>` : `<button class="form-photo placeholder" data-action="choose-draft-image" ${draftImageBusy || draftBusy ? 'disabled' : ''}><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>建议使用横向 4:3 照片</small></button>`}
         <input id="draft-file-input" class="hidden-input" type="file" accept="image/*">
       </section>
       <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
@@ -379,7 +390,7 @@ function newRecipeTemplate() {
       ${formTextarea('steps', '制作步骤', '每行一个步骤，保存后自动编号', true)}
       ${formTextarea('tips', '注意事项', '例如：粉丝吸水，汤汁不要收得太干。')}
       ${isEditing ? '' : formTextarea('note', '备注', '记录这次做菜的心得，保存时会自动加入日期。')}
-      <div class="form-bottom-actions"><button class="secondary-button" data-action="cancel-form">取消</button><button class="primary-button" data-action="save-recipe">${isEditing ? '保存修改' : '保存'}</button></div>
+      <div class="form-bottom-actions"><button class="secondary-button" data-action="cancel-form" ${draftBusy ? 'disabled' : ''}>取消</button><button class="primary-button" data-action="save-recipe" ${draftBusy || draftImageBusy ? 'disabled' : ''}>${draftBusy ? '正在保存…' : (isEditing ? '保存修改' : '保存')}</button></div>
       ${isEditing ? '<button class="delete-recipe-button" data-action="request-delete-recipe">删除菜谱</button>' : ''}
     </main>${formExitPrompt ? unsavedChangesDialog() : ''}${deleteRecipePrompt ? deleteRecipeDialog() : ''}</div>`
 }
@@ -945,6 +956,9 @@ function setupImagePreviewInteractions() {
 }
 
 function startNewRecipe() {
+  draftGeneration += 1
+  draftBusy = false
+  draftImageBusy = false
   draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
   page = 'new'
   viewingMember = null
@@ -958,6 +972,9 @@ function startNewRecipe() {
 function startEditRecipe() {
   const recipe = findRecipeById(selectedId)
   if (!recipe) { goHome(); return }
+  draftGeneration += 1
+  draftBusy = false
+  draftImageBusy = false
   draft = {
     id: recipe.id,
     name: recipe.name,
@@ -980,8 +997,13 @@ function startEditRecipe() {
 }
 
 async function saveRecipe() {
+  if (draftBusy || draftImageBusy || !draft || (page !== 'new' && page !== 'edit')) return
+  const draftRef = draft
+  const generation = draftGeneration
+  draftBusy = true
   syncDraftFields()
-  if (!draft.name.trim()) {
+  if (!draftRef.name.trim()) {
+    draftBusy = false
     document.getElementById('draft-name')?.classList.add('invalid')
     document.getElementById('draft-name')?.focus()
     return
@@ -989,50 +1011,58 @@ async function saveRecipe() {
   const now = new Date()
   const date = now.toLocaleDateString('sv-SE')
   const isEditing = page === 'edit'
-  const current = isEditing ? findRecipeById(draft.id) : null
+  const current = isEditing ? findRecipeById(draftRef.id) : null
+  if (isEditing && !current) { draftBusy = false; return }
   const id = isEditing ? current.id : Date.now()
   const previousRecipes = recipes
   const oldImageId = current?.imageId || null
   const oldImageVersion = current?.imageVersion || null
-  let imageId = draft.imageId || null
+  const imageFile = draftRef.imageFile
+  let imageId = draftRef.imageId || null
   let imageVersion = current?.imageVersion || null
   let uploadedImageId = null
   let uploadedImageVersion = null
-  if (draft.imageFile) {
+  if (imageFile) {
     imageId = uniqueId(`recipe-${id}`)
     imageVersion = now.toISOString()
     try {
-      await storeImage(imageId, draft.imageFile, imageVersion)
-      await uploadCloudImage(imageId, draft.imageFile)
+      await storeImage(imageId, imageFile, imageVersion)
+      await uploadCloudImage(imageId, imageFile)
       uploadedImageId = imageId
       uploadedImageVersion = imageVersion
     } catch (error) {
       window.alert('图片保存失败，请重新选择图片。')
       if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+      draftBusy = false
       return
     }
   }
-  if (draft.removeImage && imageId) {
+  if (draft !== draftRef || draftGeneration !== generation || (page !== 'new' && page !== 'edit')) {
+    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+    draftBusy = false
+    return
+  }
+  if (draftRef.removeImage && imageId) {
     imageId = null
     imageVersion = null
   }
   const recipe = {
-    id, name: draft.name.trim(), categories: [...draft.categories],
+    id, name: draftRef.name.trim(), categories: [...draftRef.categories],
     tags: [],
-    ingredients: splitLines(draft.ingredients), seasonings: splitLines(draft.seasonings), steps: splitLines(draft.steps),
-    tips: draft.tips.trim(),
-    notes: isEditing ? current.notes : (draft.note.trim() ? [{ id: uniqueId('note'), date, text: draft.note.trim() }] : []),
+    ingredients: splitLines(draftRef.ingredients), seasonings: splitLines(draftRef.seasonings), steps: splitLines(draftRef.steps),
+    tips: draftRef.tips.trim(),
+    notes: isEditing ? current.notes : (draftRef.note.trim() ? [{ id: uniqueId('note'), date, text: draftRef.note.trim() }] : []),
     favoriteUserIds: current?.favoriteUserIds || [],
     cookRecords: current?.cookRecords || [],
     cookCount: current?.cookCount || 0,
     lastCookedAt: current?.lastCookedAt || null,
-    image: draft.removeImage ? null : draft.image,
+    image: draftRef.removeImage ? null : draftRef.image,
     imageId,
     imageVersion,
     authorUserId: current?.authorUserId || currentUser?.id,
     authorName: current?.authorName || currentUser?.displayName || '家人',
     familyId: current?.familyId || currentUser?.familyId,
-    isFamilyShared: Boolean(draft.isFamilyShared),
+    isFamilyShared: Boolean(draftRef.isFamilyShared),
     createdByRole: current?.createdByRole || currentUser?.role || 'member',
     createdAt: current?.createdAt || now.toISOString(), modifiedAt: now.toISOString(),
   }
@@ -1044,21 +1074,23 @@ async function saveRecipe() {
     recipes = previousRecipes
     if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
     window.alert('菜谱保存失败，原图片已保留。')
+    draftBusy = false
     render()
     return
   }
-  if ((draft.imageFile || draft.removeImage) && oldImageId && oldImageId !== imageId) {
+  if ((imageFile || draftRef.removeImage) && oldImageId && oldImageId !== imageId) {
     await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
-    if (current?.image?.startsWith('blob:') && current.image !== draft.image) URL.revokeObjectURL(current.image)
+    if (current?.image?.startsWith('blob:') && current.image !== draftRef.image) URL.revokeObjectURL(current.image)
   }
   if (!isEditing) touchRecipeOpen(id)
   activeCategory = '全部'
   query = ''
   page = isEditing ? 'detail' : 'home'
   selectedId = isEditing ? id : selectedId
-  draft = null
+  if (draft === draftRef && draftGeneration === generation) draft = null
   draftDirty = false
   formExitPrompt = false
+  draftBusy = false
   render()
 }
 
@@ -1092,6 +1124,9 @@ async function deleteCurrentRecipe() {
 
 function leaveFormWithoutSaving() {
   if (draft?.imageFile && draft.image?.startsWith('blob:')) URL.revokeObjectURL(draft.image)
+  draftGeneration += 1
+  draftBusy = false
+  draftImageBusy = false
   page = draft?.id ? 'detail' : 'home'
   draft = null
   draftDirty = false
@@ -1100,6 +1135,7 @@ function leaveFormWithoutSaving() {
 }
 
 function syncDraftFields() {
+  if (!draft) return
   document.querySelectorAll('[data-draft]').forEach(field => { draft[field.dataset.draft] = field.value })
   const shared = document.getElementById('draft-family-shared')
   if (shared) draft.isFamilyShared = shared.checked
@@ -1533,18 +1569,25 @@ root.addEventListener('change', async event => {
   const file = event.target.files?.[0]
   if (!file) return
   if (event.target.id === 'draft-file-input') {
+    const draftRef = draft
+    const generation = draftGeneration
+    if (!draftRef || draftImageBusy) return
+    draftImageBusy = true
     try {
       const normalizedFile = await normalizeImageFile(file)
-      if (draft.imageFile && draft.image?.startsWith('blob:')) URL.revokeObjectURL(draft.image)
-      draft.imageFile = normalizedFile
-      draft.image = URL.createObjectURL(normalizedFile)
-      draft.removeImage = false
+      if (draft !== draftRef || draftGeneration !== generation || (page !== 'new' && page !== 'edit')) return
+      if (draftRef.imageFile && draftRef.image?.startsWith('blob:')) URL.revokeObjectURL(draftRef.image)
+      draftRef.imageFile = normalizedFile
+      draftRef.image = URL.createObjectURL(normalizedFile)
+      draftRef.removeImage = false
       draftDirty = true
+      draftImageBusy = false
       render()
     } catch (error) {
       window.alert('图片处理失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
+      if (draft === draftRef && draftGeneration === generation) draftImageBusy = false
     }
     return
   }
@@ -1563,8 +1606,11 @@ root.addEventListener('change', async event => {
     return
   }
   if (event.target.id === 'file-input') {
+    if (recipeImageBusy) return
+    recipeImageBusy = true
+    const uploadRecipeId = selectedId
     const current = findRecipeById(selectedId)
-    if (!current) return
+    if (!current) { recipeImageBusy = false; return }
     const oldImageId = current.imageId || null
     const oldImageVersion = current.imageVersion || null
     const imageId = uniqueId(`recipe-${current.id}`)
@@ -1573,6 +1619,10 @@ root.addEventListener('change', async event => {
       const normalizedFile = await normalizeImageFile(file)
       await storeImage(imageId, normalizedFile, imageVersion)
       await uploadCloudImage(imageId, normalizedFile)
+      if (page !== 'detail' || !sameId(selectedId, uploadRecipeId)) {
+        await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
+        return
+      }
       const updatedRecipe = { ...current, image: URL.createObjectURL(normalizedFile), imageId, imageVersion, modifiedAt: new Date().toISOString() }
       const previousRecipes = recipes
       recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? updatedRecipe : recipe)
@@ -1593,6 +1643,7 @@ root.addEventListener('change', async event => {
       window.alert('图片处理或保存失败，请重新选择一张普通照片。')
     } finally {
       event.target.value = ''
+      recipeImageBusy = false
     }
   }
 })
@@ -1628,7 +1679,7 @@ root.addEventListener('click', async event => {
   if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
-  if (target.dataset.draftCategory) { syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
+  if (target.dataset.draftCategory) { if (!draft || draftBusy || draftImageBusy) return; syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
   if (target.dataset.editNote) { openNoteEditor(target.dataset.editNote); return }
   if (target.dataset.deleteNote) { deleteNote(target.dataset.deleteNote); return }
   if (target.dataset.editCook) { if (canEditRecipe(findRecipeById(selectedId))) openCookEditor(target.dataset.editCook); return }
@@ -1769,8 +1820,9 @@ root.addEventListener('click', async event => {
   if (action === 'discard-changes') { leaveFormWithoutSaving(); return }
   if (action === 'continue-editing') { formExitPrompt = false; render(); return }
   if (action === 'save-and-exit') { saveRecipe(); return }
-  if (action === 'choose-draft-image') { document.getElementById('draft-file-input')?.click(); return }
+  if (action === 'choose-draft-image') { if (!draft || draftBusy || draftImageBusy) return; document.getElementById('draft-file-input')?.click(); return }
   if (action === 'remove-draft-image') {
+    if (!draft || draftBusy || draftImageBusy) return
     if (draft.imageFile && draft.image?.startsWith('blob:')) URL.revokeObjectURL(draft.image)
     draft.image = null
     draft.imageFile = null
@@ -1832,6 +1884,7 @@ function matchScope(recipe) {
   if (viewingMember) return sameId(recipe.authorUserId, viewingMember.id)
   if (activeScope === 'mine') return sameId(recipe.authorUserId, currentUser.id)
   if (activeScope === 'shared') return Boolean(recipe.isFamilyShared)
+  if (activeScope === 'favorites') return isFavorite(recipe)
   return sameId(recipe.authorUserId, currentUser.id)
 }
 
@@ -1851,12 +1904,14 @@ function homeStats() {
     return {
       mine: 0,
       shared: recipes.filter(recipe => recipe.isFamilyShared).length,
+      favorites: 0,
       members: 0,
     }
   }
   return {
     mine: recipes.filter(recipe => sameId(recipe.authorUserId, currentUser?.id)).length,
     shared: recipes.filter(recipe => recipe.isFamilyShared).length,
+    favorites: recipes.filter(recipe => isFavorite(recipe)).length,
     members: familyMemberCount || members.length || (isAdmin() ? 1 : 0),
   }
 }
@@ -1876,6 +1931,7 @@ function scopeTitle() {
   if (viewingMember) return `${viewingMember.displayName}的菜谱`
   if (currentUser?.role === 'guest') return '家庭共享'
   if (activeScope === 'shared') return '家庭共享'
+  if (activeScope === 'favorites') return '我的收藏'
   return '我的菜谱'
 }
 
@@ -1917,6 +1973,7 @@ function statsTemplate() {
   const stats = homeStats()
   const mineActive = !viewingMember && activeScope === 'mine'
   const sharedActive = !viewingMember && activeScope === 'shared'
+  const favoritesActive = !viewingMember && activeScope === 'favorites'
   if (currentUser?.role === 'guest') {
     return `<div class="home-stats guest-stats">
       <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
@@ -1924,9 +1981,10 @@ function statsTemplate() {
     </div>`
   }
   return `<div class="home-stats">
-    <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
-    <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
-    <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
+      <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
+      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
+      <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}"><strong>${stats.favorites}</strong><span>我的收藏</span></button>
+      <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
   </div>`
 }
 

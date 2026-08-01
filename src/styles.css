@@ -234,7 +234,7 @@ textarea.form-control.tall { min-height: 130px; }
 .logout-button:active { color: #99483b; }
 .header-spacer { min-width: 82px; }
 .recipe-author-line { margin: -8px 0 14px; color: #95897e; font-size: 13px; }
-.home-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: -1px 0 9px; }
+.home-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: -1px 0 9px; }
 .home-stats button,
 .home-stats > span { min-width: 0; padding: 7px 6px; border: 1px solid transparent; border-radius: 10px; color: #7f756a; background: rgba(255,255,255,.66); text-align: center; font-size: 11px; }
 .home-stats button { appearance: none; cursor: pointer; }
@@ -767,6 +767,8 @@ body.menu-open {
   --primary: #9c4b3d;
   --primary-text: #fffaf6;
   --input-bg: #ffffff;
+  --input-text: #25221e;
+  --caret-color: #9c4b3d;
   --placeholder: #a39a8f;
 }
 
@@ -779,6 +781,8 @@ body.menu-open {
   --primary: #b15b4d;
   --primary-text: #fff8f0;
   --input-bg: #2a241f;
+  --input-text: #f3eee8;
+  --caret-color: #f3a08e;
   --placeholder: #afa59b;
 }
 
@@ -932,6 +936,17 @@ body {
   background: var(--input-bg);
 }
 
+.search-box input {
+  color: var(--input-text);
+  caret-color: var(--caret-color);
+  -webkit-text-fill-color: var(--input-text);
+}
+
+.search-box input::placeholder {
+  color: var(--placeholder);
+  -webkit-text-fill-color: var(--placeholder);
+}
+
 .detail-accordion summary i {
   border-right-color: var(--text-muted);
   border-bottom-color: var(--text-muted);
@@ -1054,6 +1069,40 @@ body {
   background: var(--input-bg);
   color: var(--text);
   border-color: var(--border);
+}
+
+:root[data-theme="dark"] .search-box input,
+:root[data-theme="dark"] .search-box input:focus {
+  color: var(--input-text);
+  caret-color: var(--caret-color);
+  -webkit-text-fill-color: var(--input-text);
+}
+
+:root[data-theme="dark"] .share-status-card strong,
+:root[data-theme="dark"] .share-status-card .share-switch,
+:root[data-theme="dark"] .share-status-card .share-switch span {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .share-status-card small {
+  color: var(--text-muted);
+}
+
+:root[data-theme="dark"] .home-stats button,
+:root[data-theme="dark"] .home-stats > span {
+  color: var(--text-muted);
+  background: var(--card);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .home-stats button.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 28%, var(--card));
+  border-color: var(--primary);
+}
+
+:root[data-theme="dark"] .home-stats strong {
+  color: var(--primary-text);
 }
 
 :root[data-theme="dark"] .form-section .form-label,
