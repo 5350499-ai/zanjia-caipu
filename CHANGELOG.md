@@ -1,5 +1,22 @@
 # 更新日志
 
+## [材料统一] 2026-08-01
+
+### 修改
+
+- 新增和编辑菜谱页面删除独立“调料”输入区，材料输入提示同时覆盖食材与调味品。
+- 详情页仅显示统一材料、制作步骤、注意事项、历史备注、做菜记录和留言区，编号连续。
+- 前端缓存、IndexedDB 快照和服务端 API 读取统一合并旧 `seasonings` 到 `ingredients`，按原顺序去空行并精确去重。
+- 新写入只保存统一材料，旧 `seasonings` 列保留为空数组兼容旧客户端；不会重复追加。
+- 增加 `scripts/merge-seasonings.sql` 幂等事务脚本，覆盖 `recipes` 和旧 `family_recipe_library` JSONB 菜谱。
+
+### 数据迁移与测试
+
+- 迁移前只读统计：`recipes` 共 53 份，其中 14 份含调料（14 份材料和调料同时有内容，0 份仅有调料）；旧 JSONB 库 1 行、4 个对象，其中 1 个对象含调料。
+- 已在生产 Supabase 项目内以事务执行合并；迁移后主表和旧 JSONB 库调料非空数量均为 0，`ingredients` 均保持非空。
+- 未删除 `seasonings` 列，未修改图片、作者、共享、收藏、排序或权限字段；迁移前行快照保留在本次查询审计记录中。
+- `node --check src/main.js`、`node --check api/recipes.js`、`npm.cmd run build` 通过；Preview 待提交后部署，Production 不变。
+
 ## [文档基线] 2026-07-11
 
 ### 新增

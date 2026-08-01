@@ -73,6 +73,13 @@ Supabase REST + Storage
 
 ## 已知约束
 
+## 材料统一兼容（2026-08-01）
+
+- `recipes.ingredients` 是唯一对用户展示和写入的材料清单，食材与调味品按原顺序合并。
+- 数据库 `recipes.seasonings` 列暂时保留为空数组以兼容旧客户端；服务端读取和写入会对旧 payload 做精确去重合并。
+- `src/main.js` 的 `normalizeRecipe` 同样转换 localStorage、IndexedDB 和云端快照，避免旧缓存再次显示独立调料区或重复追加。
+- `scripts/merge-seasonings.sql` 是无 schema 变更、可重复执行的事务脚本，覆盖主 `recipes` 表和旧 JSONB 菜谱库。
+
 - 当前仓库部分历史中文字符串已出现编码损坏迹象；后续任何修改必须先确保 UTF-8 无 BOM，并在生产页面检查真实文字，而非只检查 HTTP 状态码。
 - Storage 自动删除目前必须保持 dry-run；删除/替换逻辑在确认数据库引用成功前不得清理旧文件。
 - 不得把 Service Role Key、管理员密码或 PIN 写入前端 bundle、Git 或文档。

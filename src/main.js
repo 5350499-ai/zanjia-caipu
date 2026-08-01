@@ -137,9 +137,12 @@ async function hydrateRecipesFromIndexedDB() {
 
 function normalizeRecipe(recipe) {
   const { image, ...rest } = recipe
+  const ingredients = mergeMaterialLines(rest.ingredients, rest.seasonings)
   return {
     ...rest,
     image: null,
+    ingredients,
+    seasonings: [],
     categories: rest.categories || [],
     tags: [],
     notes: (rest.notes || []).map(note => ({ ...note, id: note.id || uniqueId('note') })),
@@ -148,6 +151,23 @@ function normalizeRecipe(recipe) {
     cookCount: Number(rest.cookCount || (rest.cookRecords || []).length || 0),
     lastCookedAt: rest.lastCookedAt || null,
   }
+}
+
+function materialLines(value) {
+  if (Array.isArray(value)) return value.flatMap(item => String(item ?? '').split(/\r?\n/))
+  return String(value ?? '').split(/\r?\n/)
+}
+
+function mergeMaterialLines(...values) {
+  const seen = new Set()
+  const merged = []
+  values.flatMap(materialLines).forEach(value => {
+    const line = String(value || '').trim()
+    if (!line || seen.has(line)) return
+    seen.add(line)
+    merged.push(line)
+  })
+  return merged
 }
 
 let recipes = []
@@ -222,7 +242,6 @@ function getFilteredRecipes() {
     const searchableText = [
       recipe.name,
       ...(recipe.ingredients || []),
-      ...(recipe.seasonings || []),
       ...(recipe.steps || []),
       recipe.tips || '',
       ...(recipe.notes || []).map(note => note.text || ''),
@@ -385,8 +404,7 @@ function newRecipeTemplate() {
       <section class="form-section"><label class="form-label" for="draft-name"><strong>菜名</strong><em>必填</em></label><input class="form-control" id="draft-name" data-draft="name" value="${escapeHtml(draft.name)}" placeholder="例如：香肠豆腐粉丝烩菜"></section>
       <section class="form-section"><div class="form-label"><strong>分类</strong><span>可多选</span></div><div class="category-picker">${selectableCategories.map(category => `<button type="button" data-draft-category="${category}" class="${draft.categories.includes(category) ? 'selected' : ''}">${category}</button>`).join('')}</div></section>
       <section class="form-section"><label class="share-toggle"><input type="checkbox" id="draft-family-shared" ${draft.isFamilyShared ? 'checked' : ''}><span><strong>家庭共享</strong><small>开启后，家人都能看到；只有创建者和管理员可以修改。</small></span></label></section>
-      ${formTextarea('ingredients', '材料', '每行一种材料，例如：\n豆腐 1块\n香肠 1根')}
-      ${formTextarea('seasonings', '调料', '每行一种调料，例如：\n生抽 2勺\n盐 少许')}
+      ${formTextarea('ingredients', '材料', '每行一种材料或调料，例如：\n鸡蛋 2个\n西红柿 1个\n生抽 2勺\n盐 少许')}
       ${formTextarea('steps', '制作步骤', '每行一个步骤，保存后自动编号', true)}
       ${formTextarea('tips', '注意事项', '例如：粉丝吸水，汤汁不要收得太干。')}
       ${isEditing ? '' : formTextarea('note', '备注', '记录这次做菜的心得，保存时会自动加入日期。')}
@@ -396,7 +414,7 @@ function newRecipeTemplate() {
 }
 
 function formTextarea(key, title, placeholder, tall = false) {
-  return `<section class="form-section"><label class="form-label" for="draft-${key}"><strong>${title}</strong><span>${key === 'ingredients' || key === 'seasonings' || key === 'steps' ? '一行一项' : '可选'}</span></label><textarea class="form-control ${tall ? 'tall' : ''}" id="draft-${key}" data-draft="${key}" placeholder="${placeholder}">${escapeHtml(draft[key])}</textarea></section>`
+  return `<section class="form-section"><label class="form-label" for="draft-${key}"><strong>${title}</strong><span>${key === 'ingredients' || key === 'steps' ? '一行一项' : '可选'}</span></label><textarea class="form-control ${tall ? 'tall' : ''}" id="draft-${key}" data-draft="${key}" placeholder="${placeholder}">${escapeHtml(draft[key] || '')}</textarea></section>`
 }
 
 function actionSheet() { return `<div class="sheet-backdrop" data-action="close-menu"><div class="action-sheet"><div class="sheet-handle"></div><h2>图片操作</h2><button data-action="view-image">查看大图</button><button data-action="replace-image">更换图片</button><button class="danger" data-action="delete-image">删除图片</button><button class="cancel" data-action="close-menu">取消</button></div></div>` }
@@ -413,7 +431,7 @@ function notesSection(recipe) {
     <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-note">取消</button><button class="primary-button" data-action="save-note">保存备注</button></div>
   </div>` : ''
   const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time>${editable ? `<div class="note-actions"><button data-edit-note="${note.id}">编辑</button><button class="danger-text" data-delete-note="${note.id}">删除</button></div>` : ''}</div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有备注，做完这道菜后记一笔吧。</p>'
-  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
+  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>04</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
 }
 
 function cookRecordsSection(recipe) {
@@ -429,7 +447,7 @@ function cookRecordsSection(recipe) {
   </div>` : ''
   const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
   const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">编辑</button><button class="danger-text" data-delete-cook="${record.id}">删除</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
-  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>06</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
+  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>05</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
 }
 
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
@@ -959,7 +977,7 @@ function startNewRecipe() {
   draftGeneration += 1
   draftBusy = false
   draftImageBusy = false
-  draft = { name: '', categories: [], ingredients: '', seasonings: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
+  draft = { name: '', categories: [], ingredients: '', steps: '', tips: '', note: '', image: null, imageFile: null, imageId: null, removeImage: false, isFamilyShared: false }
   page = 'new'
   viewingMember = null
   settingsMenuOpen = false
@@ -979,8 +997,7 @@ function startEditRecipe() {
     id: recipe.id,
     name: recipe.name,
     categories: [...recipe.categories],
-    ingredients: recipe.ingredients.join('\n'),
-    seasonings: recipe.seasonings.join('\n'),
+    ingredients: mergeMaterialLines(recipe.ingredients, recipe.seasonings).join('\n'),
     steps: recipe.steps.join('\n'),
     tips: recipe.tips || '',
     image: recipe.image,
@@ -1049,7 +1066,7 @@ async function saveRecipe() {
   const recipe = {
     id, name: draftRef.name.trim(), categories: [...draftRef.categories],
     tags: [],
-    ingredients: splitLines(draftRef.ingredients), seasonings: splitLines(draftRef.seasonings), steps: splitLines(draftRef.steps),
+    ingredients: mergeMaterialLines(draftRef.ingredients), seasonings: [], steps: splitLines(draftRef.steps),
     tips: draftRef.tips.trim(),
     notes: isEditing ? current.notes : (draftRef.note.trim() ? [{ id: uniqueId('note'), date, text: draftRef.note.trim() }] : []),
     favoriteUserIds: current?.favoriteUserIds || [],
@@ -2044,7 +2061,7 @@ function commentsSection(recipe) {
     <label><span>留言内容</span><textarea id="guest-comment-content" maxlength="300" placeholder="写下你想说的话">${escapeHtml(guestCommentDraft.content || '')}</textarea></label>
     <div class="comment-form-actions"><button class="secondary-button" data-action="guest-comment-clear">清空</button><button class="primary-button" data-action="save-guest-comment" ${guestCommentBusy ? 'disabled' : ''}>提交留言</button></div>
   </div>` : ''
-  return `<section class="recipe-section comments-section"><div class="recipe-section-title"><span>07</span><h2>留言区</h2></div><div class="recipe-section-body">${recipe.isFamilyShared ? '' : '<p class="empty-copy">仅家庭共享菜谱支持留言。</p>'}${form}${recipeCommentsRecipeId === recipe.id && recipeCommentsLoading ? '<p class="empty-copy">正在加载留言…</p>' : ''}${list}</div></section>`
+  return `<section class="recipe-section comments-section"><div class="recipe-section-title"><span>06</span><h2>留言区</h2></div><div class="recipe-section-body">${recipe.isFamilyShared ? '' : '<p class="empty-copy">仅家庭共享菜谱支持留言。</p>'}${form}${recipeCommentsRecipeId === recipe.id && recipeCommentsLoading ? '<p class="empty-copy">正在加载留言…</p>' : ''}${list}</div></section>`
 }
 
 function detailTemplate(recipe) {
@@ -2061,12 +2078,11 @@ function detailTemplate(recipe) {
       ${showWritingActions ? `<div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
       ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('02', '调料', `<ul class="simple-list">${recipe.seasonings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
-      ${section('03', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
-      ${section('04', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
+      ${section('02', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
+      ${section('03', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
       ${notesSection(recipe)}
-      ${commentsSection(recipe)}
       ${cookRecordsSection(recipe)}
+      ${commentsSection(recipe)}
     </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
 }
 

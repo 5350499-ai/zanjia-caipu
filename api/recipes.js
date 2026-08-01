@@ -1,13 +1,31 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
 
+function mergeMaterialLines(...values) {
+  const seen = new Set()
+  const merged = []
+  values.flatMap(value => {
+    if (Array.isArray(value)) return value.flatMap(item => String(item ?? '').split(/\r?\n/))
+    return String(value ?? '').split(/\r?\n/)
+  }).forEach(value => {
+    const line = String(value || '').trim()
+    if (!line || seen.has(line)) return
+    seen.add(line)
+    merged.push(line)
+  })
+  return merged
+}
+
 function toClient(row) {
   return {
     id: /^\d+$/.test(row.id) ? Number(row.id) : row.id,
     name: row.name,
     categories: row.categories || [],
-    ingredients: row.ingredients || [],
-    seasonings: row.seasonings || [],
+    ingredients: mergeMaterialLines(row.ingredients, row.seasonings),
+    // Retain the legacy response field for old clients, but keep it empty so
+    // the new UI has one canonical materials list and cannot render a second
+    // 调料 section.
+    seasonings: [],
     steps: row.steps || [],
     tips: row.tips || '',
     notes: row.notes || [],
@@ -37,8 +55,10 @@ function toRow(recipe, user, existing = null) {
     id: String(recipe.id),
     name: String(recipe.name || '').trim(),
     categories: recipe.categories || [],
-    ingredients: recipe.ingredients || [],
-    seasonings: recipe.seasonings || [],
+    ingredients: mergeMaterialLines(recipe.ingredients, recipe.seasonings, existing?.seasonings),
+    // Keep the column for backwards-compatible database/API payloads. New
+    // writes always clear it after folding its values into ingredients.
+    seasonings: [],
     steps: recipe.steps || [],
     tips: recipe.tips || '',
     notes: recipe.notes || [],
