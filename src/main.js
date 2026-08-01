@@ -1530,14 +1530,16 @@ root.addEventListener('input', event => {
 })
 
 root.addEventListener('submit', async event => {
-  if (event.target.id !== 'member-login-form' && event.target.id !== 'admin-login-form') return
+  if (event.target.id !== 'login-form') return
   event.preventDefault()
   if (authBusy) return
   const formData = new FormData(event.target)
-  const isAdmin = event.target.id === 'admin-login-form'
+  const account = String(formData.get('account') || '').trim()
+  const password = String(formData.get('password') || '')
+  const isAdmin = account.includes('@')
   const payload = isAdmin
-    ? { mode: 'admin', email: formData.get('email'), password: formData.get('password') }
-    : { mode: 'member', loginCode: formData.get('loginCode'), pin: formData.get('pin') }
+    ? { mode: 'admin', email: account, password }
+    : { mode: 'member', loginCode: account, pin: password }
   authBusy = true
   root.innerHTML = authTemplate()
   try {
@@ -1555,7 +1557,7 @@ root.addEventListener('submit', async event => {
       return startApplication()
     }
     root.innerHTML = authTemplate(result.error || '登录失败')
-    document.getElementById(isAdmin ? 'admin-email' : 'member-code')?.focus()
+    document.getElementById('login-account')?.focus()
   } catch {
     authBusy = false
     root.innerHTML = authTemplate('网络连接失败，请稍后重试')
@@ -1819,7 +1821,7 @@ root.addEventListener('click', async event => {
       members = []
       page = 'home'
       root.innerHTML = authTemplate()
-      document.getElementById('member-code')?.focus()
+      document.getElementById('login-account')?.focus()
     })
     return
   }
@@ -2007,24 +2009,14 @@ function statsTemplate() {
 
 function authTemplate(message = '') {
   return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
-    <form id="member-login-form" class="login-form">
-      <h2>家庭成员登录</h2>
-      <label for="member-code">账号编号</label>
-      <input id="member-code" name="loginCode" inputmode="numeric" autocomplete="username" placeholder="例如：001" autofocus>
-      <label for="member-pin">PIN / 密码</label>
-      <input id="member-pin" name="pin" type="password" autocomplete="current-password" placeholder="请输入 PIN">
+    <form id="login-form" class="login-form">
+      <h2>登录咱家菜谱</h2>
+      <label for="login-account">账号</label>
+      <input id="login-account" name="account" autocomplete="username" placeholder="管理员邮箱或家庭成员编号" autofocus>
+      <label for="login-password">密码 / PIN</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码或 PIN">
       <button type="submit" ${authBusy ? 'disabled' : ''}>${authBusy ? '正在进入…' : '进入菜谱'}</button>
     </form>
-    <details class="admin-login-panel">
-      <summary>管理员邮箱登录</summary>
-      <form id="admin-login-form" class="login-form">
-        <label for="admin-email">邮箱</label>
-        <input id="admin-email" name="email" type="email" autocomplete="username" placeholder="管理员邮箱">
-        <label for="admin-password">密码</label>
-        <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="管理员密码">
-        <button type="submit" ${authBusy ? 'disabled' : ''}>管理员进入</button>
-      </form>
-    </details>
     <button class="guest-login-button" type="button" data-action="guest-login">游客浏览</button>
     <div class="auth-error" role="alert">${escapeHtml(message)}</div><small>不开放注册，账号由管理员创建</small></section></main>`
 }
@@ -2319,7 +2311,7 @@ root.addEventListener('click', async event => {
       recipeComments = []
       recipeCommentsRecipeId = null
       root.innerHTML = authTemplate()
-      document.getElementById('member-code')?.focus()
+      document.getElementById('login-account')?.focus()
       console.info('[guest] returned to login')
     })
     return
