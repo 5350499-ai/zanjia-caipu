@@ -459,7 +459,8 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 .detail-content { padding-left: 18px; padding-right: 18px; }
 .detail-content > .image-area { border-radius: 18px; }
 .recipe-section { padding: 28px 2px; border-top: 1px solid #e5e0d8; }
-.detail-content > .image-area + .recipe-section { margin-top: 24px; }
+/* The hidden file input sits between the hero image and the first section. */
+.detail-content > .image-area + .hidden-input + .recipe-section { margin-top: 24px; border-top: 0; }
 .recipe-section-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 17px; }
 .recipe-section-title > span { color: #a05245; font: italic 13px Georgia, serif; }
 .recipe-section-title h2 { margin: 0; color: #24201c; font: 800 23px/1.2 Georgia, "Songti SC", serif; letter-spacing: -.02em; }
