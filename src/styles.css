@@ -152,7 +152,8 @@ textarea.form-control { min-height: 94px; resize: vertical; }
 textarea.form-control.tall { min-height: 130px; }
 .form-photo { overflow: hidden; position: relative; width: 100%; aspect-ratio: 4 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px dashed #aaa298; border-radius: 5px; background: #dedbd5; color: #746e66; }
 .form-photo small { color: #8d867e; }
-.form-photo img { width: 100%; height: 100%; object-fit: cover; }
+.form-photo.has-image { display: block; padding: 0; border: 0; }
+.form-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; border-radius: inherit; }
 .form-photo.has-image span { position: absolute; right: 10px; bottom: 10px; padding: 7px 11px; border-radius: 4px; color: #fff; background: rgba(32, 28, 24, .72); font-size: 13px; font-weight: 700; }
 .remove-form-photo { width: 100%; height: 46px; margin-top: 8px; border: 1px solid #e1c4be; border-radius: 4px; color: #aa3b2c; background: #fff6f3; font-size: 15px; font-weight: 800; }
 .category-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -1188,6 +1189,16 @@ body {
 :root[data-theme="dark"] .form-photo.has-image span {
   background: rgba(12, 11, 10, .7);
   color: #fff;
+}
+
+:root[data-theme="dark"] .form-section .remove-form-photo {
+  border-color: #6a4a43;
+  color: #d97a6a;
+  background: #2b2622;
+}
+
+:root[data-theme="dark"] .form-section .remove-form-photo:active {
+  background: #3a2b27;
 }
 
 :root[data-theme="dark"] .secondary-button {
