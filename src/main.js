@@ -2050,7 +2050,7 @@ function scopeTitle() {
   return '我的菜谱'
 }
 
-function settingsMenuTemplate() {
+function settingsMenuTemplateRaw() {
   if (!settingsMenuOpen) return ''
   const selectedRecipe = findRecipeById(selectedId)
   if (currentUser?.role === 'guest') {
@@ -2201,6 +2201,12 @@ async function quickCookRecipe() {
     render()
     window.alert(error?.message || '记录失败，请稍后再试')
   }
+}
+
+function settingsMenuTemplate() {
+  return settingsMenuTemplateRaw()
+    .replace(/<button data-action="storage-stats">[\s\S]*?<\/button>/g, '')
+    .replace(/<button data-action="cleanup-images">[\s\S]*?<\/button>/g, '')
 }
 
 function render(preserveFocus = false) {
