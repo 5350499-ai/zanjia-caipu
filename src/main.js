@@ -2177,6 +2177,7 @@ async function quickCookRecipe() {
     const count = Number(result.count || cookStatus.count || recipe.cookCount || 0)
     cookStatus = { recipeId: recipe.id, count, todayRecorded: true, loading: false, busy: false }
     recipes = recipes.map(item => sameId(item.id, recipe.id) ? { ...item, cookCount: count, lastCookedAt: new Date().toLocaleDateString('sv-SE') } : item)
+    await syncCloudLibrary({ force: true })
     render()
   } catch (error) {
     cookStatus = { ...cookStatus, busy: false }
@@ -2271,7 +2272,6 @@ function openRecipe(recipeId) {
   page = 'detail'
   history.pushState({ appPage: 'detail', recipeId }, '')
   clearRecipeComments()
-  openRecipeComments(recipeId)
   render()
 }
 
