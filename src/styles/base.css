@@ -1,0 +1,27 @@
+/* Global, non-business defaults only. */
+*, *::before, *::after { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  font-family: var(--font-family-sans);
+  font-synthesis: none;
+}
+
+button,
+input,
+textarea,
+select { font: inherit; }
+
+button { color: inherit; }
+img { max-width: 100%; }

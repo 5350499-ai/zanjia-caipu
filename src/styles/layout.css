@@ -1,0 +1,17 @@
+/* Low-risk layout primitives for future component migration. */
+.app-shell {
+  width: 100%;
+  max-width: var(--page-max-width);
+  min-height: 100dvh;
+  margin-inline: auto;
+  min-width: 0;
+}
+
+.app-shell :where(*),
+.app-shell :where(*::before),
+.app-shell :where(*::after) { min-width: 0; }
+
+.app-shell :where(img, input, textarea, select, button) {
+  max-width: 100%;
+  box-sizing: border-box;
+}

@@ -106,6 +106,11 @@
 
 - 删除主图下方第一段材料区块继承的多余顶部边框。
 - 其他菜谱章节分隔线保持不变。
+## 2026-08-14 - UI root Phase 1
+
+- Added the first design-token, theme, base, layout, component, form, and iOS platform layers without changing business behavior or visual values.
+- Kept the legacy stylesheet in place for compatibility; source-text encoding debt remains intentionally out of scope.
+
 ## 2026-08-14 - Detail note and cook record form UI
 
 - Applied dark-theme surfaces and readable text/caret colors to the shared note editor used by history notes and cooking records.

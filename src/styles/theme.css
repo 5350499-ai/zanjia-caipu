@@ -1,0 +1,58 @@
+/* Phase 1 semantic theme root. Keep values aligned with the existing CSS. */
+:root {
+  --bg: #e8e6e1;
+  --card: #fffdf9;
+  --text: #25221e;
+  --text-muted: #80786f;
+  --border: #e6ddd2;
+  --primary: #9c4b3d;
+  --primary-text: #fffaf6;
+  --input-bg: #ffffff;
+  --input-text: #25221e;
+  --caret-color: #9c4b3d;
+  --placeholder: #a39a8f;
+  --color-bg: var(--bg);
+  --color-surface: var(--card);
+  --color-surface-raised: #fffdf9;
+  --color-surface-input: var(--input-bg);
+  --color-text-primary: var(--text);
+  --color-text-secondary: #4d463f;
+  --color-text-muted: var(--text-muted);
+  --color-text-placeholder: var(--placeholder);
+  --color-brand: var(--primary);
+  --color-brand-strong: #9c3d2d;
+  --color-danger: #b03428;
+  --color-success: #4d8062;
+  --color-border: var(--border);
+  --color-divider: var(--border);
+  --color-overlay: rgba(24, 21, 18, .45);
+}
+
+:root[data-theme="dark"] {
+  --bg: #171310;
+  --card: #2a241f;
+  --text: #f5f1ea;
+  --text-muted: #b8aea2;
+  --border: #4a4038;
+  --primary: #b15b4d;
+  --primary-text: #fff8f0;
+  --input-bg: #2a241f;
+  --input-text: #f3eee8;
+  --caret-color: #f3a08e;
+  --placeholder: #afa59b;
+  --color-bg: var(--bg);
+  --color-surface: var(--card);
+  --color-surface-raised: #2e2722;
+  --color-surface-input: var(--input-bg);
+  --color-text-primary: var(--text);
+  --color-text-secondary: #d2c8bd;
+  --color-text-muted: var(--text-muted);
+  --color-text-placeholder: var(--placeholder);
+  --color-brand: var(--primary);
+  --color-brand-strong: #c26b5b;
+  --color-danger: #d97a6a;
+  --color-success: #83b08f;
+  --color-border: var(--border);
+  --color-divider: var(--border);
+  --color-overlay: rgba(0, 0, 0, .56);
+}

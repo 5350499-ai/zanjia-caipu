@@ -762,34 +762,6 @@ body.menu-open {
   }
 }
 
-:root {
-  --bg: #e8e6e1;
-  --card: #fffdf9;
-  --text: #25221e;
-  --text-muted: #80786f;
-  --border: #e6ddd2;
-  --primary: #9c4b3d;
-  --primary-text: #fffaf6;
-  --input-bg: #ffffff;
-  --input-text: #25221e;
-  --caret-color: #9c4b3d;
-  --placeholder: #a39a8f;
-}
-
-:root[data-theme="dark"] {
-  --bg: #171310;
-  --card: #2a241f;
-  --text: #f5f1ea;
-  --text-muted: #b8aea2;
-  --border: #4a4038;
-  --primary: #b15b4d;
-  --primary-text: #fff8f0;
-  --input-bg: #2a241f;
-  --input-text: #f3eee8;
-  --caret-color: #f3a08e;
-  --placeholder: #afa59b;
-}
-
 body {
   background: var(--bg);
   color: var(--text);

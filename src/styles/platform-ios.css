@@ -1,0 +1,26 @@
+/* iOS/PWA platform primitives only; no business colors or layout. */
+html,
+body { -webkit-tap-highlight-color: transparent; }
+
+input[type="search"],
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="search"],
+input[type="date"],
+textarea {
+  -webkit-text-fill-color: var(--color-text-primary);
+  caret-color: var(--caret-color);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select { color-scheme: dark; }
+
+@media (display-mode: standalone) {
+  body { min-height: 100dvh; }
+}

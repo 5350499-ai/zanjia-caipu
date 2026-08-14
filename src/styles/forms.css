@@ -1,0 +1,30 @@
+/* Phase 1 form foundations. Existing business selectors remain in styles.css. */
+.form-control,
+input,
+textarea,
+select {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.form-control,
+input,
+textarea,
+select {
+  color: var(--color-text-primary);
+  background: var(--color-surface-input);
+  border-color: var(--color-border);
+  font-size: var(--font-size-control);
+}
+
+input::placeholder,
+textarea::placeholder { color: var(--color-text-placeholder); }
+
+input[type="search"],
+input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
