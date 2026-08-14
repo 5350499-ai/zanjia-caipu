@@ -116,14 +116,15 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .note-actions { display: flex; gap: 4px; }
 .note-actions button { min-width: 48px; height: 36px; border: 0; border-radius: 3px; color: #6f665c; background: #eee9df; font-size: 14px; font-weight: 700; }
 .note-actions button.danger-text { color: #ad3b2b; background: #f7e8e4; }
-.note-editor { margin: 0 0 20px; padding: 15px; display: grid; gap: 13px; border: 1px solid #d5c5b8; border-left: 4px solid #9c3d2d; border-radius: 4px; background: #fff; box-shadow: 0 4px 18px rgba(54, 42, 27, .06); }
-.note-editor label { display: grid; gap: 7px; color: #4d463f; font-size: 15px; font-weight: 800; }
+.note-editor { min-width: 0; margin: 0 0 20px; padding: 15px; display: grid; gap: 13px; border: 1px solid #d5c5b8; border-left: 4px solid #9c3d2d; border-radius: 4px; background: #fff; box-shadow: 0 4px 18px rgba(54, 42, 27, .06); }
+.note-editor label { min-width: 0; display: grid; gap: 7px; color: #4d463f; font-size: 15px; font-weight: 800; }
 .note-editor input, .note-editor textarea { width: 100%; padding: 11px 12px; border: 1px solid #d4ccbf; border-radius: 4px; outline: 0; color: #2d2822; background: #fbfaf7; font-size: 17px; }
+.note-editor input[type="date"] { display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; -webkit-appearance: none; appearance: none; }
 .note-editor input { min-height: 50px; }
 .note-editor textarea { min-height: 128px; resize: vertical; line-height: 1.6; }
 .note-editor input:focus, .note-editor textarea:focus { border-color: #9c3d2d; box-shadow: 0 0 0 3px rgba(156, 61, 45, .1); }
 .note-editor textarea.invalid { border-color: #bd3828; background: #fff7f5; }
-.note-editor-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.note-editor-actions { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; }
 .note-editor-actions .secondary-button, .note-editor-actions .primary-button { height: 50px; }
 .empty-copy { color: #948d83; font-size: 15px; }
 
@@ -304,6 +305,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 :root[data-theme="dark"] .recipe-card,
 :root[data-theme="dark"] .form-section,
 :root[data-theme="dark"] .detail-accordion,
+:root[data-theme="dark"] .note-editor,
 :root[data-theme="dark"] .cook-record,
 :root[data-theme="dark"] .search-box,
 :root[data-theme="dark"] .app-info-panel { background: #29241f; border-color: #40372f; color: #f2eee6; }
@@ -1065,12 +1067,43 @@ body {
 
 :root[data-theme="dark"] .search-box,
 :root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .note-editor input,
 :root[data-theme="dark"] .note-editor textarea,
 :root[data-theme="dark"] .comment-form input,
 :root[data-theme="dark"] .comment-form textarea {
   background: var(--input-bg);
   color: var(--text);
   border-color: var(--border);
+}
+
+:root[data-theme="dark"] .note-editor {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+}
+
+:root[data-theme="dark"] .note-editor label {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .note-editor input,
+:root[data-theme="dark"] .note-editor textarea {
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--border);
+  caret-color: var(--caret-color);
+  -webkit-text-fill-color: var(--input-text);
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] .note-editor input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 :root[data-theme="dark"] .search-box input,

@@ -106,6 +106,11 @@
 
 - 删除主图下方第一段材料区块继承的多余顶部边框。
 - 其他菜谱章节分隔线保持不变。
+## 2026-08-14 - Detail note and cook record form UI
+
+- Applied dark-theme surfaces and readable text/caret colors to the shared note editor used by history notes and cooking records.
+- Constrained date inputs and action grids to the parent width for narrow iPhone layouts.
+
 ## 2026-08-11
 
 ### 新增/编辑菜谱图片预览
