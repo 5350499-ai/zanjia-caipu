@@ -2,6 +2,7 @@ import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticRespo
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
+const homeCategories = categories.filter(category => category !== '粥类')
 const selectableCategories = categories.slice(1)
 
 const starterRecipes = [
@@ -174,6 +175,7 @@ let recipes = []
 
 let activeCategory = '全部'
 let activeScope = 'mine'
+let homeListExpanded = false
 let query = ''
 let selectedId = null
 let page = 'home'
@@ -340,9 +342,17 @@ function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
   const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
-  return `<div class="list-heading"><h2>${query ? `“${escapeHtml(query)}”` : scopeTitle()}</h2><span>${filtered.length} 道</span></div><div class="recipe-list">
-    ${filtered.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
-    ${filtered.length ? '' : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
+  const isDefaultHome = page === 'home' && !viewingMember && activeScope === 'mine' && activeCategory === '全部' && !query.trim() && !homeListExpanded
+  const visibleRecipes = isDefaultHome ? filtered.slice(0, 6) : filtered
+  const shouldShowMore = isDefaultHome && filtered.length > visibleRecipes.length
+  const leaderboard = isDefaultHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
+      <div><span class="home-leaderboard-kicker">FAMILY TABLE</span><h2>本月家里最常做</h2></div>
+      <p>开始记录做菜次数后，这里会出现本月排行榜。</p>
+    </section>` : ''
+  const more = shouldShowMore ? `<button class="home-show-more" type="button" data-action="expand-home-list">查看全部菜谱 <span>${filtered.length} 道</span></button>` : ''
+  return `<div class="recipe-list">
+    ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
+    ${visibleRecipes.length ? `${leaderboard}${more}` : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
 }
 
 function homeTemplate() {
@@ -353,8 +363,8 @@ function homeTemplate() {
       </div>
       ${settingsMenuTemplate()}
       ${statsTemplate()}
-      <label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜菜名或材料" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
-      <nav class="category-nav" aria-label="菜谱分类">${categories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></header>
+      <div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
+      <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
 }
@@ -1455,7 +1465,8 @@ function setupPullToRefresh() {
   let pullDistance = 0
 
   panel.addEventListener('touchstart', event => {
-    if (refreshing || page !== 'home' || panel.scrollTop > 0 || event.touches.length !== 1) return
+    const scrollTop = Math.max(panel.scrollTop, window.scrollY, document.documentElement.scrollTop)
+    if (refreshing || page !== 'home' || scrollTop > 0 || event.touches.length !== 1) return
     tracking = true
     pullDistance = 0
     startY = event.touches[0].clientY
@@ -1694,8 +1705,8 @@ root.addEventListener('click', async event => {
     render()
     initSupabaseSessionBridge().catch(() => null)
   }
-  if (target.dataset.category) { activeCategory = target.dataset.category; settingsMenuOpen = false; render(); return }
-  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
+  if (target.dataset.category) { activeCategory = target.dataset.category; homeListExpanded = false; settingsMenuOpen = false; render(); return }
+  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; homeListExpanded = false; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { if (!draft || draftBusy || draftImageBusy) return; syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
@@ -1744,6 +1755,7 @@ root.addEventListener('click', async event => {
   if (action === 'save-cook-record') { saveCookRecord(); return }
   if (action === 'choose-cook-image') { document.getElementById('cook-file-input')?.click(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
+  if (action === 'expand-home-list') { homeListExpanded = true; render(); return }
   if (action === 'toggle-theme') { toggleTheme(); return }
   if (action === 'share-url') {
     try {
@@ -1959,11 +1971,15 @@ function settingsMenuTemplate() {
   const selectedRecipe = findRecipeById(selectedId)
   if (currentUser?.role === 'guest') {
     return `<div class="settings-layer" data-action="close-settings"><div class="settings-popover" role="dialog" aria-label="设置菜单">
+      <button data-action="toggle-theme">${themeMode === 'dark' ? '切换浅色模式' : '切换深色模式'}</button>
+      <button data-action="share-url">分享链接</button>
       <button data-action="guest-exit">退出游客模式</button>
       <button class="muted" data-action="close-settings">取消</button>
     </div></div>`
   }
   return `<div class="settings-layer" data-action="close-settings"><div class="settings-popover" role="dialog" aria-label="设置菜单">
+    <button data-action="toggle-theme">${themeMode === 'dark' ? '切换浅色模式' : '切换深色模式'}</button>
+    <button data-action="share-url">分享链接</button>
     ${page === 'new' || page === 'edit' ? '' : '<button data-action="new-recipe">新增菜谱</button>'}
     ${page === 'detail' && canEditRecipe(selectedRecipe) ? '<button data-action="edit-recipe">编辑菜谱</button>' : ''}
     <button data-action="account-info">账号信息</button>
@@ -1982,8 +1998,6 @@ function settingsMenuTemplate() {
 
 function globalActionsTemplate() {
   return `<div class="global-actions" aria-label="全局操作">
-    <button class="global-icon-button" data-action="toggle-theme" aria-label="切换主题">${themeMode === 'dark' ? '🌙' : '🌞'}</button>
-    <button class="global-icon-button" data-action="share-url" aria-label="分享网址">🔗</button>
     <button class="global-icon-button" data-action="settings" aria-label="菜单">☰</button>
   </div>`
 }
@@ -1999,12 +2013,11 @@ function statsTemplate() {
       <span class="stat-card disabled"><strong>游客</strong><span>仅浏览</span></span>
     </div>`
   }
-  return `<div class="home-stats">
+  return `<div class="home-stats" aria-label="菜谱范围">
       <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
       <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
       <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}"><strong>${stats.favorites}</strong><span>我的收藏</span></button>
-      <span class="stat-card disabled"><strong>${stats.members}</strong><span>家庭成员</span></span>
-  </div>`
+    </div>`
 }
 
 function authTemplate(message = '') {

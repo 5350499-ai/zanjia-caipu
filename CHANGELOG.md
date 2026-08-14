@@ -137,3 +137,9 @@
 ## 2026-08-14 - UI root Phase 6
 - Added shared image-frame tokens and adapters for 4:3 cover presentation, placeholders, record images, and fixed-width growth thumbnails.
 - Kept lightbox contain behavior and all image storage, caching, upload, deletion, and touch logic unchanged.
+
+## 2026-08-14 - Home redesign Phase 7
+- Redesigned the home screen into a compact, image-first family recipe experience with three lightweight scope tabs and a combined search/category row.
+- Added the six-recipe default home preview, a non-data-backed monthly ranking empty state, and a simple expand-to-all entry.
+- Moved theme and share actions into the existing menu, kept member management admin-only there, and removed only the home navigation entry for the porridge category.
+- Updated warm light and dark theme tokens without changing recipe data, authentication, storage, caching, or API behavior.
