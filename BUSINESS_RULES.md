@@ -62,7 +62,7 @@
 - A valid recipe with a finished-dish `image_id` receives one `initial_image_baseline` event dated 2026-08-14 during the idempotent migration. Recipes without an image receive no baseline.
 - Existing JSON `cook_records` are preserved and mapped as `legacy_cook_record` events before baseline creation. The migration is guarded by a unique baseline index and an audit row.
 - New recipes saved with a finished-dish image create one `recipe_created_with_image` event after the recipe save succeeds. Retries cannot create a second baseline event.
-- Manual “记录这次” creates at most one `manual` event per recipe, user, and Europe/Madrid calendar day. The API and database unique partial index both enforce this rule; duplicate attempts return a clear Chinese message.
+- Manual “记录这次” creates at most one `manual` event per recipe and Europe/Madrid family calendar day. The API and database unique partial index both enforce this rule; duplicate attempts return a clear Chinese message.
 - Guests cannot write events. Members may record recipes they can view; administrators follow existing family visibility rules.
 - The home monthly ranking uses event counts for the current Europe/Madrid calendar month, then latest cooked date/time, recipe creation time, and stable name ordering. It shows at most five clickable recipes.
 

@@ -52,7 +52,7 @@ module.exports = async function handler(requestMessage, response) {
     const cookedOn = body?.cookedOn || madridDate()
     if (!validDate(cookedOn)) return sendJson(response, 400, { error: '做菜日期格式不正确' })
     const existing = await request('/rest/v1/recipe_cook_events', {
-      query: `?recipe_id=eq.${encodeFilter(recipeId)}&user_id=eq.${encodeFilter(user.id)}&cooked_on=eq.${encodeFilter(cookedOn)}&source=eq.manual&select=id&limit=1`,
+      query: `?recipe_id=eq.${encodeFilter(recipeId)}&cooked_on=eq.${encodeFilter(cookedOn)}&source=eq.manual&select=id&limit=1`,
     })
     if (existing.length) return sendJson(response, 200, { duplicate: true, message: '今天已经记录过这道菜了', eventId: existing[0].id, ...(await countRecipeEvents(recipeId)) })
     let rows

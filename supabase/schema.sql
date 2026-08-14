@@ -109,7 +109,7 @@ revoke all on public.recipe_cook_events from anon, authenticated;
 create index if not exists recipe_cook_events_family_date_idx on public.recipe_cook_events (family_id, cooked_on desc);
 create index if not exists recipe_cook_events_recipe_date_idx on public.recipe_cook_events (recipe_id, cooked_on desc);
 create unique index if not exists recipe_cook_events_baseline_once_idx on public.recipe_cook_events (recipe_id) where source in ('initial_image_baseline', 'recipe_created_with_image');
-create unique index if not exists recipe_cook_events_manual_daily_idx on public.recipe_cook_events (recipe_id, user_id, cooked_on) where source = 'manual' and user_id is not null;
+create unique index if not exists recipe_cook_events_manual_daily_idx on public.recipe_cook_events (recipe_id, cooked_on) where source = 'manual';
 create unique index if not exists recipe_cook_events_legacy_dedupe_idx on public.recipe_cook_events (recipe_id, cooked_on, source, coalesce(user_id, '00000000-0000-0000-0000-000000000000'::uuid), created_at) where source = 'legacy_cook_record';
 
 create table if not exists public.recipe_cook_event_migration_audit (
