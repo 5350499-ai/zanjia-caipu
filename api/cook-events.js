@@ -1,6 +1,6 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
-const { canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking } = require('../lib/cook-events')
+const { DAILY_COOK_SOURCES, canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking } = require('../lib/cook-events')
 
 function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
@@ -37,7 +37,7 @@ module.exports = async function handler(requestMessage, response) {
       if (!recipe) return sendJson(response, 403, { error: '无权查看这道菜的做菜记录' })
       const detailEvents = visibleEvents.filter(event => String(event.recipe_id) === String(recipeId))
       const today = madridDate()
-      return sendJson(response, 200, { events: detailEvents, count: detailEvents.length, lastCookedOn: detailEvents[0]?.cooked_on || null, todayRecorded: detailEvents.some(event => event.cooked_on === today) })
+      return sendJson(response, 200, { events: detailEvents, count: detailEvents.length, lastCookedOn: detailEvents[0]?.cooked_on || null, todayRecorded: detailEvents.some(event => event.cooked_on === today && DAILY_COOK_SOURCES.has(event.source)) })
     }
     const month = madridDate().slice(0, 7)
     const rankings = buildMonthlyRanking(recipes, visibleEvents, month)

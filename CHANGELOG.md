@@ -166,3 +166,7 @@
 - Confirmed image-backed recipe creation keeps its first cooking event after the recipe save succeeds; the existing server baseline constraint remains the idempotency guard.
 - Expanded the monthly home ranking presentation and query result to Top 10 without changing its ordering rules.
 - Added server-side unreferenced-image deletion for explicit removal, replacement, recipe deletion, and edit-save rollback; dry-run orphan cleanup remains unchanged.
+## Phase 7.5
+
+- Treat the first successful image added to a recipe with zero cook events as the idempotent first cook event, including recipes created without an image.
+- Keep historical image baselines out of the daily manual-cook lock while retaining them for totals and rankings.

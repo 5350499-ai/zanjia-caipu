@@ -92,3 +92,7 @@ Explicit image removal now calls the server-side `deleteImageIfUnreferenced` hel
 - Storage 自动删除目前必须保持 dry-run；删除/替换逻辑在确认数据库引用成功前不得清理旧文件。
 - 不得把 Service Role Key、管理员密码或 PIN 写入前端 bundle、Git 或文档。
 - 管理员可通过设置菜单读取 `recipe-images` bucket 的对象数量和扫描到的总字节数；`SUPABASE_STORAGE_CAPACITY_BYTES` 可提供容量上限并计算 70% 告警。该统计是当前 bucket 对象合计，不等同于 Supabase 账户配额页面的全局配额。
+
+## Cook history and first-image completion (Phase 7.5)
+
+Cook counts belong to `recipe_cook_events`, not to the image itself. A recipe with no events creates its first automatic event after a successful save with a non-empty `image_id`; this also covers adding the first image later. The existing idempotent `recipe_created_with_image` source is retained for compatibility. Replacing, deleting, or re-uploading an image never changes existing cook history. Historical `initial_image_baseline` events count toward totals and rankings, but do not block the daily manual-cook action; daily status is limited to manual and first-image event sources.
