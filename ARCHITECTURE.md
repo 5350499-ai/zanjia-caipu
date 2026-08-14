@@ -73,6 +73,10 @@ Supabase REST + Storage
 
 ## 已知约束
 
+## Cooking event layer (Phase 7.2)
+
+`api/cook-events.js` exposes authenticated event reads and writes. `lib/cook-events.js` centralizes Europe/Madrid calendar handling, recipe visibility checks, event summaries, baseline creation, and monthly ranking tie-breaks. The `recipe_cook_events` table is append-oriented and auditable; `recipes.cook_count`/`last_cooked_at` are maintained only as compatibility projections. `api/recipes.js` returns event-derived counts and the current monthly top five, while `src/cloud.js` and `src/main.js` connect the existing “记录这次” UI without introducing a second button or changing image/auth/storage behavior.
+
 ## 材料统一兼容（2026-08-01）
 
 - `recipes.ingredients` 是唯一对用户展示和写入的材料清单，食材与调味品按原顺序合并。

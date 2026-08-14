@@ -93,3 +93,32 @@ alter table public.guest_comments enable row level security;
 revoke all on public.guest_comments from anon, authenticated;
 
 create index if not exists guest_comments_recipe_idx on public.guest_comments (recipe_id, created_at desc);
+
+create table if not exists public.recipe_cook_events (
+  id uuid primary key default gen_random_uuid(),
+  recipe_id text not null references public.recipes(id) on delete cascade,
+  family_id text not null,
+  user_id uuid references public.family_profiles(id) on delete set null,
+  cooked_on date not null,
+  source text not null check (source in ('initial_image_baseline', 'recipe_created_with_image', 'legacy_cook_record', 'manual')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.recipe_cook_events enable row level security;
+revoke all on public.recipe_cook_events from anon, authenticated;
+create index if not exists recipe_cook_events_family_date_idx on public.recipe_cook_events (family_id, cooked_on desc);
+create index if not exists recipe_cook_events_recipe_date_idx on public.recipe_cook_events (recipe_id, cooked_on desc);
+create unique index if not exists recipe_cook_events_baseline_once_idx on public.recipe_cook_events (recipe_id) where source in ('initial_image_baseline', 'recipe_created_with_image');
+create unique index if not exists recipe_cook_events_manual_daily_idx on public.recipe_cook_events (recipe_id, user_id, cooked_on) where source = 'manual' and user_id is not null;
+create unique index if not exists recipe_cook_events_legacy_dedupe_idx on public.recipe_cook_events (recipe_id, cooked_on, source, coalesce(user_id, '00000000-0000-0000-0000-000000000000'::uuid), created_at) where source = 'legacy_cook_record';
+
+create table if not exists public.recipe_cook_event_migration_audit (
+  migration_key text primary key,
+  recipe_total integer not null,
+  image_recipe_total integer not null,
+  legacy_record_total integer not null,
+  baseline_created integer not null,
+  created_at timestamptz not null default now()
+);
+alter table public.recipe_cook_event_migration_audit enable row level security;
+revoke all on public.recipe_cook_event_migration_audit from anon, authenticated;

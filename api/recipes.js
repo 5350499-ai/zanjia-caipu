@@ -1,5 +1,6 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
+const { buildMonthlyRanking, countRecipeEvents, ensureImageBaseline, listFamilyEvents, madridDate } = require('../lib/cook-events')
 
 function mergeMaterialLines(...values) {
   const seen = new Set()
@@ -16,7 +17,7 @@ function mergeMaterialLines(...values) {
   return merged
 }
 
-function toClient(row) {
+function toClient(row, summary = null) {
   return {
     id: /^\d+$/.test(row.id) ? Number(row.id) : row.id,
     name: row.name,
@@ -32,8 +33,8 @@ function toClient(row) {
     tags: row.tags || [],
     favoriteUserIds: row.favorite_user_ids || [],
     cookRecords: row.cook_records || [],
-    cookCount: row.cook_count || 0,
-    lastCookedAt: row.last_cooked_at || null,
+    cookCount: summary ? summary.count : (row.cook_count || 0),
+    lastCookedAt: summary ? summary.lastCookedAt : (row.last_cooked_at || null),
     image: null,
     imageId: row.image_id || null,
     imageVersion: row.image_version || null,
@@ -65,8 +66,8 @@ function toRow(recipe, user, existing = null) {
     tags: recipe.tags || [],
     favorite_user_ids: recipe.favoriteUserIds || [],
     cook_records: recipe.cookRecords || [],
-    cook_count: Number(recipe.cookCount || 0),
-    last_cooked_at: recipe.lastCookedAt || null,
+    cook_count: existing ? Number(existing.cook_count || 0) : Number(recipe.cookCount || 0),
+    last_cooked_at: existing ? (existing.last_cooked_at || null) : (recipe.lastCookedAt || null),
     image_id: recipe.imageId || null,
     image_version: recipe.imageVersion || null,
     author_user_id: ownerId,
@@ -90,7 +91,21 @@ async function loadVisibleRecipes(user) {
     query += `&or=(author_user_id.eq.${encodeFilter(user.id)},is_family_shared.eq.true)`
   }
   const rows = await request('/rest/v1/recipes', { query })
-  return rows.map(toClient)
+  const events = await listFamilyEvents(user.familyId)
+  const visibleIds = new Set(rows.map(row => String(row.id)))
+  const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
+  const summaries = new Map()
+  visibleEvents.forEach(event => {
+    const summary = summaries.get(String(event.recipe_id)) || { count: 0, lastCookedAt: null }
+    summary.count += 1
+    if (!summary.lastCookedAt || String(event.cooked_on) > String(summary.lastCookedAt)) summary.lastCookedAt = event.cooked_on
+    summaries.set(String(event.recipe_id), summary)
+  })
+  const month = madridDate().slice(0, 7)
+  return {
+    recipes: rows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, lastCookedAt: null })),
+    monthlyRanking: buildMonthlyRanking(rows, visibleEvents, month),
+  }
 }
 
 async function loadFamilyStats(user) {
@@ -117,9 +132,9 @@ module.exports = async function handler(requestMessage, response) {
   if (!user) return sendJson(response, 401, { error: 'Unauthorized' })
 
   if (requestMessage.method === 'GET') {
-    const recipes = await loadVisibleRecipes(user)
+    const { recipes, monthlyRanking } = await loadVisibleRecipes(user)
     const stats = await loadFamilyStats(user)
-    return sendJson(response, 200, { recipes, stats })
+    return sendJson(response, 200, { recipes, stats, monthlyRanking })
   }
 
   if (user.role === 'guest') {
@@ -137,7 +152,19 @@ module.exports = async function handler(requestMessage, response) {
       headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify(row),
     })
-    return sendJson(response, 200, { recipe: toClient(row) })
+    if (row.image_id) {
+      await ensureImageBaseline({ id: row.id, image_id: row.image_id, family_id: row.family_id })
+      const summary = await countRecipeEvents(row.id)
+      row.cook_count = summary.count
+      row.last_cooked_at = summary.lastCookedAt
+      await request(`/rest/v1/recipes?id=eq.${encodeFilter(row.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ cook_count: summary.count, last_cooked_at: summary.lastCookedAt }),
+      })
+      return sendJson(response, 200, { recipe: toClient(row, summary) })
+    }
+    return sendJson(response, 200, { recipe: toClient(row, { count: 0, lastCookedAt: null }) })
   }
 
   if (requestMessage.method === 'DELETE') {

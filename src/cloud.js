@@ -7,7 +7,34 @@ export async function loadCloudLibrary() {
   if (!response.ok) throw new Error(`Cloud read failed: ${response.status}`)
   const data = await response.json()
   window.__familyRecipeStats = data.stats || null
+  window.__familyRecipeMonthlyRanking = Array.isArray(data.monthlyRanking) ? data.monthlyRanking : []
   return data.recipes || []
+}
+
+export async function createCloudCookEvent(recipeId, cookedOn) {
+  const response = await fetch(`/api/cook-events?recipeId=${encodeURIComponent(recipeId)}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cookedOn }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const error = new Error(data.error || `Cook event failed: ${response.status}`)
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+  return data
+}
+
+export async function deleteCloudCookEvent(eventId) {
+  const response = await fetch(`/api/cook-events?eventId=${encodeURIComponent(eventId)}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  })
+  if (!response.ok) throw new Error(`Cook event delete failed: ${response.status}`)
+  return response.json().catch(() => ({}))
 }
 
 export async function saveCloudLibrary(recipes) {

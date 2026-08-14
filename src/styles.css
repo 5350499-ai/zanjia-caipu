@@ -1596,25 +1596,6 @@ body,
   margin: 0;
 }
 
-.home-library-entry {
-  min-height: 34px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  background: var(--color-surface-raised);
-  font-family: var(--font-family-sans);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.home-library-entry span {
-  margin-left: 2px;
-  color: var(--color-text-muted);
-}
-
 .home-search-row {
   min-width: 0;
   display: grid;
@@ -1768,6 +1749,72 @@ body,
   font-size: var(--font-size-section);
 }
 
+.home-leaderboard-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-leaderboard-heading > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.home-ranking-row {
+  position: relative;
+  min-width: 0;
+  min-height: 42px;
+  padding: 7px 0 6px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+}
+
+.home-ranking-position {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  color: var(--color-brand-strong);
+  font-weight: var(--font-weight-bold);
+}
+
+.home-ranking-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-ranking-count {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.home-ranking-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+}
+
+.home-ranking-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-brand);
+}
+
+.home-leaderboard-empty,
 .home-leaderboard p {
   margin: 3px 0 0;
   color: var(--color-text-muted);
@@ -1806,7 +1853,6 @@ body,
   .home-shell .home-header,
   .home-shell .recipe-panel { padding-left: 12px; padding-right: 12px; }
   .home-search-row { grid-template-columns: minmax(80px, 30fr) minmax(0, 70fr); gap: 5px; }
-  .home-library-entry { padding-left: 6px; padding-right: 6px; font-size: 11px; }
   .home-shell .home-stats { gap: 3px; }
   .home-shell .home-stats button { padding-left: 2px; padding-right: 2px; font-size: 11px; }
   .home-search-row .category-nav button { padding-left: 6px; padding-right: 6px; font-size: 11px; }

@@ -150,3 +150,9 @@
 - Compressed recipe card titles to one left-aligned ellipsized line and reduced the title-area padding while preserving the shared 4:3 image presentation.
 - Reduced light and dark surface color weight through existing theme tokens; no recipe data, authentication, image cache, storage, or Service Worker behavior changed.
 - Recorded future cooking-event rules only. No ranking data, events, database schema, or migrations were created.
+
+## 2026-08-14 - Home redesign Phase 7.2
+- Removed the duplicate “全部菜谱” entry; the “我的菜谱” scope now toggles compact HOME and the full personal library.
+- Added the auditable `recipe_cook_events` model and idempotent baseline migration for pictured recipes, preserving legacy `cook_records` and compatibility counters.
+- Connected the existing “记录这次” action to daily de-duplicated manual events, event-derived totals, and a real monthly Top 5 home ranking.
+- Kept Production unchanged; this work is Preview-only pending mobile acceptance.

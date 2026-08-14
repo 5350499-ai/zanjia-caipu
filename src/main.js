@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -177,6 +177,7 @@ let activeCategory = '全部'
 let activeScope = 'mine'
 let homeView = 'home'
 let query = ''
+let monthlyRanking = []
 let selectedId = null
 let page = 'home'
 let members = []
@@ -342,10 +343,14 @@ function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
   const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
-  const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && activeScope === 'mine' && activeCategory === '全部' && !query.trim()
+  const compactScope = currentUser?.role === 'guest' ? activeScope === 'shared' : activeScope === 'mine'
+  const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && compactScope && activeCategory === '全部' && !query.trim()
   const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
+  const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
+  const rankingRows = monthlyRanking.slice(0, 5).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
   const leaderboard = isCompactHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
-      <div><h2>本月家里最常做</h2><p>排行榜将在做菜记录启用后自动生成</p></div>
+      <div class="home-leaderboard-heading"><h2>本月家里最常做</h2><span>Top 5</span></div>
+      ${rankingRows || '<p class="home-leaderboard-empty">本月还没有做菜记录</p>'}
     </section>` : ''
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
@@ -360,7 +365,7 @@ function homeTemplate() {
         ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
-      <div class="home-scope-controls">${statsTemplate()}${currentUser?.role === 'guest' ? '' : (homeView === 'library' ? '<button class="home-library-entry" type="button" data-action="return-compact-home">← 返回首页</button>' : `<button class="home-library-entry" type="button" data-action="open-library">全部菜谱 <span>${homeStats().mine}</span></button>`)}</div>
+      <div class="home-scope-controls">${statsTemplate()}</div>
       <div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
@@ -444,6 +449,7 @@ function notesSection(recipe) {
 
 function cookRecordsSection(recipe) {
   const editable = canEditRecipe(recipe)
+  const recordable = canRecordRecipe(recipe)
   const records = [...(recipe.cookRecords || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)))
   const form = cookEditor ? `<div class="note-editor cook-editor">
     <label for="cook-date"><span>做菜时间</span><input id="cook-date" type="date" value="${cookEditor.date}"></label>
@@ -455,7 +461,7 @@ function cookRecordsSection(recipe) {
   </div>` : ''
   const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
   const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">编辑</button><button class="danger-text" data-delete-cook="${record.id}">删除</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
-  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>05</span><h2>做菜记录</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
+  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>05</span><h2>做菜记录</h2></div><div class="recipe-section-body">${recordable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
 }
 
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
@@ -859,6 +865,7 @@ async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
     const cloudRecipes = await loadCloudLibrary()
+    const nextMonthlyRanking = Array.isArray(window.__familyRecipeMonthlyRanking) ? window.__familyRecipeMonthlyRanking : []
     if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
@@ -867,8 +874,10 @@ async function syncCloudLibrary({ force = false } = {}) {
       const currentImage = currentRecipeImages.get(String(recipe.id))
       if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
     })
-    const shouldRender = force || recipesChanged(syncedRecipes)
+    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking)
+    const shouldRender = force || recipesChanged(syncedRecipes) || rankingChanged
     recipes = syncedRecipes
+    monthlyRanking = nextMonthlyRanking
     const serializable = serializeRecipes()
     storageSet(userStorageKey(), JSON.stringify(serializable))
     writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
@@ -1365,7 +1374,8 @@ function openCookEditor(recordId = null) {
 
 async function saveCookRecord() {
   const current = findRecipeById(selectedId)
-  if (!canEditRecipe(current)) return
+  const isNewRecord = !cookEditor?.id
+  if (!current || (isNewRecord ? !canRecordRecipe(current) : !canEditRecipe(current))) return
   const previousRecipes = recipes
   const date = document.getElementById('cook-date')?.value || new Date().toLocaleDateString('sv-SE')
   const note = document.getElementById('cook-note')?.value.trim() || ''
@@ -1375,6 +1385,7 @@ async function saveCookRecord() {
   const oldImageVersion = existingRecord?.imageVersion || null
   let uploadedImageId = null
   let uploadedImageVersion = null
+  let createdEventId = null
   const record = {
     id: cookEditor.id || uniqueId('cook'),
     date,
@@ -1399,19 +1410,42 @@ async function saveCookRecord() {
       return
     }
   }
+  if (isNewRecord) {
+    try {
+      const eventResult = await createCloudCookEvent(selectedId, date)
+      if (eventResult?.duplicate) {
+        if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+        window.alert(eventResult.message || '今天已经记录过这道菜了')
+        return
+      }
+      createdEventId = eventResult?.event?.id || null
+    } catch (error) {
+      if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+      window.alert(error?.message || '做菜记录保存失败，请稍后重试')
+      return
+    }
+  }
+  if (createdEventId) record.eventId = createdEventId
   let updatedRecipe = null
   recipes = recipes.map(recipe => {
     if (!sameId(recipe.id, selectedId)) return recipe
     const cookRecords = cookEditor.id
       ? (recipe.cookRecords || []).map(item => sameId(item.id, cookEditor.id) ? record : item)
       : [record, ...(recipe.cookRecords || [])]
-    updatedRecipe = { ...recipe, cookRecords, cookCount: cookRecords.length, lastCookedAt: date, modifiedAt: new Date().toISOString() }
+    updatedRecipe = {
+      ...recipe,
+      cookRecords,
+      cookCount: isNewRecord ? Math.max(Number(recipe.cookCount || 0) + 1, cookRecords.length) : Number(recipe.cookCount || cookRecords.length),
+      lastCookedAt: isNewRecord ? date : (recipe.lastCookedAt || date),
+      modifiedAt: new Date().toISOString(),
+    }
     return updatedRecipe
   })
   try {
     await persistSingleRecipe(updatedRecipe)
   } catch (error) {
     recipes = previousRecipes
+    if (createdEventId) await deleteCloudCookEvent(createdEventId).catch(() => null)
     if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
     window.alert('做菜记录保存失败，原图片已保留。')
     render()
@@ -1421,6 +1455,7 @@ async function saveCookRecord() {
     await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
   }
   cookEditor = null
+  if (isNewRecord) await syncCloudLibrary({ force: true })
   render()
 }
 
@@ -1450,6 +1485,15 @@ async function deleteCookRecord(recordId) {
     window.alert('做菜记录删除失败，图片和数据已保留。')
     render()
     return
+  }
+  if (record.eventId) {
+    try {
+      await deleteCloudCookEvent(record.eventId)
+    } catch (error) {
+      window.alert(error?.message || '做菜记录删除失败，请稍后重试')
+      await syncCloudLibrary({ force: true })
+      return
+    }
   }
   if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion)])
   if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
@@ -1721,7 +1765,16 @@ root.addEventListener('click', async event => {
     initSupabaseSessionBridge().catch(() => null)
   }
   if (target.dataset.category) { activeCategory = target.dataset.category; homeView = 'library'; settingsMenuOpen = false; render(); return }
-  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; homeView = 'library'; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
+  if (target.dataset.scope) {
+    const nextScope = target.dataset.scope
+    if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
+    else { activeScope = nextScope; homeView = 'library' }
+    viewingMember = null
+    settingsMenuOpen = false
+    activeCategory = '全部'
+    render()
+    return
+  }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { if (!draft || draftBusy || draftImageBusy) return; syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
@@ -1765,13 +1818,11 @@ root.addEventListener('click', async event => {
   if (action === 'toggle-favorite') { toggleFavorite(); return }
   if (action === 'toggle-family-share') { toggleFamilyShare(); return }
   if (action === 'copy-recipe') { copySelectedRecipe(); return }
-  if (action === 'add-cook-record') { if (canEditRecipe(findRecipeById(selectedId))) openCookEditor(); return }
+  if (action === 'add-cook-record') { if (canRecordRecipe(findRecipeById(selectedId))) openCookEditor(); return }
   if (action === 'cancel-cook-record') { cookEditor = null; render(); return }
   if (action === 'save-cook-record') { saveCookRecord(); return }
   if (action === 'choose-cook-image') { document.getElementById('cook-file-input')?.click(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
-  if (action === 'open-library') { homeView = 'library'; settingsMenuOpen = false; render(); return }
-  if (action === 'return-compact-home') { activeScope = 'mine'; activeCategory = '全部'; query = ''; homeView = 'home'; settingsMenuOpen = false; render(); return }
   if (action === 'toggle-theme') { toggleTheme(); return }
   if (action === 'share-url') {
     try {
@@ -1938,6 +1989,11 @@ function matchScope(recipe) {
 function canEditRecipe(recipe) {
   if (currentUser?.role === 'guest') return false
   return isAdmin() || sameId(recipe?.authorUserId, currentUser?.id)
+}
+
+function canRecordRecipe(recipe) {
+  if (currentUser?.role === 'guest') return false
+  return canViewRecipe(recipe)
 }
 
 function canViewRecipe(recipe) {

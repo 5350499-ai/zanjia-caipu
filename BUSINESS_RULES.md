@@ -56,6 +56,16 @@
 
 ## Future cooking-event rules (design only)
 
+## Cooking events Phase 7.2 (2026-08-14)
+
+- `recipe_cook_events` is the auditable source for cooking counts and future month/year rankings. Existing `recipes.cook_count` and `last_cooked_at` remain compatibility projections only.
+- A valid recipe with a finished-dish `image_id` receives one `initial_image_baseline` event dated 2026-08-14 during the idempotent migration. Recipes without an image receive no baseline.
+- Existing JSON `cook_records` are preserved and mapped as `legacy_cook_record` events before baseline creation. The migration is guarded by a unique baseline index and an audit row.
+- New recipes saved with a finished-dish image create one `recipe_created_with_image` event after the recipe save succeeds. Retries cannot create a second baseline event.
+- Manual “记录这次” creates at most one `manual` event per recipe, user, and Europe/Madrid calendar day. The API and database unique partial index both enforce this rule; duplicate attempts return a clear Chinese message.
+- Guests cannot write events. Members may record recipes they can view; administrators follow existing family visibility rules.
+- The home monthly ranking uses event counts for the current Europe/Madrid calendar month, then latest cooked date/time, recipe creation time, and stable name ordering. It shows at most five clickable recipes.
+
 - When cooking events are introduced in a separately approved phase, every valid existing recipe must receive one auditable initial made baseline so it does not begin at zero. The baseline must not invent a historical cooking date or automatically count as a current-month event.
 - A newly saved recipe with a finished-dish photo should create one cooking event after the recipe save succeeds. A recipe without that photo does not receive this automatic event.
 - The same recipe may add at most one made count per local calendar day. Rankings must use real cooking events and support month and year aggregation; they must not rely on a permanently incremented recipe field.
