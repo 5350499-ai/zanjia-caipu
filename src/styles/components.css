@@ -18,7 +18,9 @@
 .button-secondary { color: var(--color-text-primary); background: var(--color-surface); }
 .button-danger { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-danger); }
 .surface,
-.card { color: var(--color-text-primary); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.card { color: var(--color-text-primary); background: var(--color-surface); border: var(--border-width-default) solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); }
+.card-raised { background: var(--color-surface-raised); box-shadow: var(--shadow-raised); }
+.card-muted { background: var(--color-surface-muted); }
 .icon-button { min-width: 0; }
 .button:focus-visible,
 .icon-button:focus-visible,

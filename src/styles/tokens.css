@@ -38,6 +38,9 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-pill: 999px;
+  --radius-card: 16px;
+  --radius-panel: 14px;
+  --radius-control: 12px;
   --control-height-sm: 40px;
   --control-height-md: 48px;
   --control-height-lg: 54px;
@@ -48,4 +51,10 @@
   --ratio-recipe-card: 4 / 3;
   --ratio-form-photo: 4 / 3;
   --ratio-record-photo: 4 / 3;
+  --border-width-default: 1px;
+  --border-width-strong: 2px;
+  --shadow-card: 0 4px 15px rgba(50, 40, 30, .055);
+  --shadow-raised: 0 8px 28px rgba(30, 22, 14, .08);
+  --shadow-modal: 0 18px 60px rgba(18, 15, 12, .22);
+  --shadow-bottom-bar: 0 -7px 24px rgba(48, 39, 29, .07);
 }

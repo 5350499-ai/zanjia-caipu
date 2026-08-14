@@ -128,3 +128,6 @@
 ## 2026-08-14 - UI root Phase 3
 - Added shared button behavior and form-control foundations, then connected existing business selectors through lightweight CSS adapters.
 - Preserved existing dimensions, page structure, interaction logic, and legacy business-specific styles.
+## 2026-08-14 - UI root Phase 4
+- Added surface, border, radius, and shadow tokens and connected existing card, panel, menu, dialog, and bottom-bar selectors through CSS adapters.
+- Preserved page structure, layout, imagery, and business behavior.

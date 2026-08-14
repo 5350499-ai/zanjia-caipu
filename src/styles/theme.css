@@ -14,6 +14,8 @@
   --color-bg: var(--bg);
   --color-surface: var(--card);
   --color-surface-raised: #fffdf9;
+  --color-surface-muted: #f1f1f3;
+  --color-surface-overlay: rgba(255, 253, 248, .98);
   --color-surface-input: var(--input-bg);
   --color-text-primary: var(--text);
   --color-text-secondary: #4d463f;
@@ -24,6 +26,7 @@
   --color-danger: #b03428;
   --color-success: #4d8062;
   --color-border: var(--border);
+  --color-border-strong: #d7d0c4;
   --color-divider: var(--border);
   --color-overlay: rgba(24, 21, 18, .45);
   --color-surface-subtle: #f1f1f3;
@@ -60,6 +63,9 @@
   --color-border: var(--border);
   --color-divider: var(--border);
   --color-overlay: rgba(0, 0, 0, .56);
+  --color-surface-muted: #2b2622;
+  --color-surface-overlay: #2e2722;
+  --color-border-strong: #5a5048;
   --color-surface-subtle: #2b2622;
   --color-on-brand: #fff;
   --color-danger-surface: #352722;

@@ -1312,3 +1312,35 @@ body {
 .share-switch input:checked + i {
   background: var(--color-brand);
 }
+
+/* Phase 4 adapters: preserve business layout while sharing visual primitives. */
+.recipe-card {
+  border-color: var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.settings-popover,
+.share-status-card {
+  border-color: var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.detail-accordion,
+.comment-item,
+.app-info-panel,
+.cook-record {
+  border-color: var(--color-border);
+  border-radius: var(--radius-panel);
+}
+
+.member-card { border-color: var(--color-border); border-radius: var(--radius-control); }
+.note-editor { border-color: var(--color-border); border-radius: var(--radius-sm); }
+
+.confirm-dialog {
+  border-color: var(--color-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-modal);
+}
+
+.form-bottom-actions { box-shadow: var(--shadow-bottom-bar); }
