@@ -356,6 +356,7 @@ function recipePanelTemplate() {
 }
 
 function homeTemplate() {
+  if (!homeCategories.includes(activeCategory)) activeCategory = '全部'
   return `<div class="app-shell home-shell">
     <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
       <div class="home-action-row">
