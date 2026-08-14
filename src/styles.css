@@ -1414,7 +1414,11 @@ body,
 
 .category-nav {
   min-width: 0;
-  max-width: 100%;
+  /* The nav intentionally bleeds through the header's horizontal padding. */
+  width: calc(100% + 28px);
+  max-width: none;
+  margin-left: -14px;
+  margin-right: -14px;
   overscroll-behavior-inline: contain;
 }
 
@@ -1461,4 +1465,10 @@ body,
 @media (min-width: 420px) {
   .home-header,
   .detail-content { padding-left: var(--page-padding-inline-fluid); padding-right: var(--page-padding-inline-fluid); }
+
+  .category-nav {
+    width: calc(100% + var(--page-padding-inline-fluid) + var(--page-padding-inline-fluid));
+    margin-left: calc(-1 * var(--page-padding-inline-fluid));
+    margin-right: calc(-1 * var(--page-padding-inline-fluid));
+  }
 }
