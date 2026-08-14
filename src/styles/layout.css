@@ -15,3 +15,34 @@
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* Phase 5 responsive primitives. Page-specific layout remains in styles.css. */
+html,
+body,
+#app {
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-shell,
+.home-header,
+.detail-header,
+.detail-content,
+.form-shell,
+.form-bottom-actions,
+.settings-popover,
+.confirm-dialog,
+.action-sheet {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-shell :where(.home-body, .recipe-list, .detail-content, .form-section, .note-editor, .cook-record, .comment-form) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-shell :where(.recipe-list, .form-bottom-actions, .comment-form-actions) > * {
+  min-width: 0;
+}

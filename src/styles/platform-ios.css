@@ -24,3 +24,9 @@ textarea {
 @media (display-mode: standalone) {
   body { min-height: 100dvh; }
 }
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .form-bottom-actions {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+}

@@ -131,3 +131,6 @@
 ## 2026-08-14 - UI root Phase 4
 - Added surface, border, radius, and shadow tokens and connected existing card, panel, menu, dialog, and bottom-bar selectors through CSS adapters.
 - Preserved page structure, layout, imagery, and business behavior.
+## 2026-08-14 - UI root Phase 5
+- Added responsive width, min-width, max-width, date-control, safe-area, and compact/wide phone primitives without changing page structure or business behavior.
+- Kept existing responsive page rules and image ratios intact; no home redesign was introduced.
