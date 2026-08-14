@@ -156,3 +156,8 @@
 - Added the auditable `recipe_cook_events` model and idempotent baseline migration for pictured recipes, preserving legacy `cook_records` and compatibility counters.
 - Connected the existing “记录这次” action to daily de-duplicated manual events, event-derived totals, and a real monthly Top 5 home ranking.
 - Kept Production unchanged; this work is Preview-only pending mobile acceptance.
+
+## 2026-08-14 - Home redesign Phase 7.3
+- Simplified recipe details by removing the duplicate copy action and the default comments section while retaining legacy comment APIs/data.
+- Moved favorite to the family-sharing status card and reduced the image-to-ingredients gap.
+- Replaced the default cooking-record editor with a one-tap “今天做了这道菜 +1” completion action backed by the existing cook-event API and daily duplicate protection.

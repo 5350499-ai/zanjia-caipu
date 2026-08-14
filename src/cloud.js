@@ -28,6 +28,13 @@ export async function createCloudCookEvent(recipeId, cookedOn) {
   return data
 }
 
+export async function loadCloudCookStatus(recipeId) {
+  const response = await fetch(`/api/cook-events?recipeId=${encodeURIComponent(recipeId)}`, { credentials: 'same-origin', cache: 'no-store' })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Cook status failed: ${response.status}`)
+  return data
+}
+
 export async function deleteCloudCookEvent(eventId) {
   const response = await fetch(`/api/cook-events?eventId=${encodeURIComponent(eventId)}`, {
     method: 'DELETE',

@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -178,6 +178,7 @@ let activeScope = 'mine'
 let homeView = 'home'
 let query = ''
 let monthlyRanking = []
+let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
 let page = 'home'
 let members = []
@@ -444,24 +445,17 @@ function notesSection(recipe) {
     <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-note">取消</button><button class="primary-button" data-action="save-note">保存备注</button></div>
   </div>` : ''
   const list = notes.length ? `<div class="note-list">${notes.map(note => `<article class="note"><div class="note-top"><time>${note.date}</time>${editable ? `<div class="note-actions"><button data-edit-note="${note.id}">编辑</button><button class="danger-text" data-delete-note="${note.id}">删除</button></div>` : ''}</div><p>${escapeHtml(note.text)}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有备注，做完这道菜后记一笔吧。</p>'
-  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>04</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
+  return `<section class="recipe-section notes-section"><div class="recipe-section-title"><span>05</span><h2>历史备注</h2></div><div class="recipe-section-body">${editable ? '<div class="notes-toolbar"><button data-action="add-note">+ 增加备注</button></div>' : ''}${form}${list}</div></section>`
 }
 
 function cookRecordsSection(recipe) {
-  const editable = canEditRecipe(recipe)
   const recordable = canRecordRecipe(recipe)
-  const records = [...(recipe.cookRecords || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)))
-  const form = cookEditor ? `<div class="note-editor cook-editor">
-    <label for="cook-date"><span>做菜时间</span><input id="cook-date" type="date" value="${cookEditor.date}"></label>
-    <label for="cook-note"><span>这次记录</span><textarea id="cook-note" placeholder="例如：今天面太硬，下次多加一点水。">${escapeHtml(cookEditor.note)}</textarea></label>
-    <label for="cook-rating"><span>这次评分</span><select id="cook-rating">${[0,1,2,3,4,5].map(value => `<option value="${value}" ${Number(cookEditor.rating || 0) === value ? 'selected' : ''}>${value ? `${value} 星` : '不评分'}</option>`).join('')}</select></label>
-    ${cookEditor.image ? `<button class="record-photo has-image" data-action="choose-cook-image"><img src="${cookEditor.image}" alt="这次做菜图片"><span>更换图片</span></button>` : `<button class="record-photo placeholder" data-action="choose-cook-image"><span class="placeholder-plus">+</span><strong>添加这次图片</strong></button>`}
-    <input id="cook-file-input" class="hidden-input" type="file" accept="image/*">
-    <div class="note-editor-actions"><button class="secondary-button" data-action="cancel-cook-record">取消</button><button class="primary-button" data-action="save-cook-record">${cookEditor.id ? '保存修改' : '保存记录'}</button></div>
-  </div>` : ''
-  const growth = records.filter(record => record.image).length ? `<div class="growth-strip">${records.filter(record => record.image).map(record => `<img src="${record.image}" alt="${escapeHtml(record.date || '做菜图片')}">`).join('')}</div>` : ''
-  const list = records.length ? `<div class="cook-record-list">${records.map(record => `<article class="cook-record"><div class="cook-record-head"><time>${record.date || ''}</time><span>${record.rating ? '★'.repeat(Number(record.rating)) : ''}</span>${editable ? `<div class="note-actions"><button data-edit-cook="${record.id}">编辑</button><button class="danger-text" data-delete-cook="${record.id}">删除</button></div>` : ''}</div>${record.image ? `<img src="${record.image}" alt="做菜记录图片">` : ''}<p>${escapeHtml(record.note || '这次没有备注')}</p></article>`).join('')}</div>` : '<p class="empty-copy">还没有做菜记录。每做一次，就记一笔。</p>'
-  return `<section class="recipe-section cook-section"><div class="recipe-section-title"><span>05</span><h2>做菜记录</h2></div><div class="recipe-section-body">${recordable ? '<div class="notes-toolbar"><button data-action="add-cook-record">+ 记录这次</button></div>' : ''}${form}${growth}${list}</div></section>`
+  const status = cookStatus.recipeId && sameId(cookStatus.recipeId, recipe.id) ? cookStatus : { count: Number(recipe.cookCount || 0), todayRecorded: false, loading: true, busy: false }
+  const completed = Boolean(status.todayRecorded)
+  const button = recordable
+    ? `<button class="cook-complete-button ${completed ? 'completed' : ''}" data-action="quick-cook" ${completed || status.busy ? 'disabled' : ''}>${completed ? '今天已记录 ✓' : (status.busy ? '正在记录…' : '今天做了这道菜 +1')}</button>`
+    : ''
+  return `<section class="recipe-section cook-section cook-completion-section"><div class="recipe-section-title"><span>04</span><h2>做过次数</h2></div><div class="recipe-section-body"><div class="cook-completion-card"><strong>已做 ${Number(status.count || 0)} 次</strong>${status.loading ? '<small>正在确认今天的记录状态…</small>' : ''}${button}</div></div></section>`
 }
 
 function escapeHtml(text = '') { return String(text).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])) }
@@ -1816,6 +1810,7 @@ root.addEventListener('click', async event => {
   if (action === 'cancel-note') { noteEditor = null; render(); return }
   if (action === 'save-note') { saveNote(); return }
   if (action === 'toggle-favorite') { toggleFavorite(); return }
+  if (action === 'quick-cook') { quickCookRecipe(); return }
   if (action === 'toggle-family-share') { toggleFamilyShare(); return }
   if (action === 'copy-recipe') { copySelectedRecipe(); return }
   if (action === 'add-cook-record') { if (canRecordRecipe(findRecipeById(selectedId))) openCookEditor(); return }
@@ -2150,24 +2145,49 @@ function detailTemplate(recipe) {
       <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
       <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
         <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能看到这道菜。' : '只有创建者和管理员可以看到。'}</small></div>
-        <label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>
+        <div class="share-card-actions"><label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>${showWritingActions ? `<button class="detail-favorite-button" data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button>` : ''}</div>
       </div>
-      ${showWritingActions ? `<div class="detail-quick-actions"><button data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button><button data-action="copy-recipe">复制菜谱</button></div>` : ''}
       ${imageArea(recipe)}<input id="file-input" class="hidden-input" type="file" accept="image/*">
       ${section('01', '材料', `<ul class="simple-list">${recipe.ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)}
       ${section('02', '制作步骤', `<ol class="steps">${recipe.steps.map((step,index) => `<li><span>${index + 1}</span><p>${escapeHtml(step)}</p></li>`).join('')}</ol>`)}
       ${section('03', '注意事项', `<p class="body-copy">${escapeHtml(recipe.tips || '暂无')}</p>`)}
-      ${notesSection(recipe)}
       ${cookRecordsSection(recipe)}
-      ${commentsSection(recipe)}
+      ${notesSection(recipe)}
     </main>${imageMenu ? actionSheet() : ''}${imagePreview && recipe.image ? imageLightbox(recipe) : ''}</div>`
+}
+
+async function loadCookStatus(recipeId) {
+  cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), todayRecorded: false, loading: true, busy: false }
+  try {
+    const status = await loadCloudCookStatus(recipeId)
+    cookStatus = { recipeId, count: Number(status.count || 0), todayRecorded: Boolean(status.todayRecorded), loading: false, busy: false }
+  } catch (error) {
+    cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), todayRecorded: false, loading: false, busy: false }
+  }
+  if (page === 'detail' && sameId(selectedId, recipeId)) render()
+}
+
+async function quickCookRecipe() {
+  const recipe = findRecipeById(selectedId)
+  if (!recipe || !canRecordRecipe(recipe) || cookStatus.busy) return
+  cookStatus = { ...cookStatus, recipeId: recipe.id, busy: true, loading: false }
+  render()
+  try {
+    const result = await createCloudCookEvent(recipe.id)
+    const count = Number(result.count || cookStatus.count || recipe.cookCount || 0)
+    cookStatus = { recipeId: recipe.id, count, todayRecorded: true, loading: false, busy: false }
+    recipes = recipes.map(item => sameId(item.id, recipe.id) ? { ...item, cookCount: count, lastCookedAt: new Date().toLocaleDateString('sv-SE') } : item)
+    render()
+  } catch (error) {
+    cookStatus = { ...cookStatus, busy: false }
+    render()
+    window.alert(error?.message || '记录失败，请稍后再试')
+  }
 }
 
 function render(preserveFocus = false) {
   syncMenuScrollLock()
-  if (page === 'detail' && selectedId && recipeCommentsRecipeId !== selectedId && !recipeCommentsLoading) {
-    openRecipeComments(selectedId)
-  }
+  if (page === 'detail' && selectedId && !cookStatus.loading && !sameId(cookStatus.recipeId, selectedId)) loadCookStatus(selectedId)
   if (page === 'new' || page === 'edit') root.innerHTML = newRecipeTemplate()
   else if (page === 'members') root.innerHTML = membersTemplate()
   else if (page === 'detail') {

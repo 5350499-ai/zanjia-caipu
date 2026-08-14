@@ -66,6 +66,12 @@
 - Guests cannot write events. Members may record recipes they can view; administrators follow existing family visibility rules.
 - The home monthly ranking uses event counts for the current Europe/Madrid calendar month, then latest cooked date/time, recipe creation time, and stable name ordering. It shows at most five clickable recipes.
 
+## Detail completion interaction Phase 7.3 (2026-08-14)
+
+- Recipe details expose one primary completion action: “今天做了这道菜 +1”. It uses the existing manual cook-event endpoint and inherits the family-day duplicate rule.
+- Guests remain read-only and do not receive an executable completion button. History notes and legacy detailed `cook_records` data remain preserved even though the old editor is no longer the default detail UI.
+- Comments remain stored and served by their existing API for compatibility, but are not rendered in the standard recipe detail page.
+
 - When cooking events are introduced in a separately approved phase, every valid existing recipe must receive one auditable initial made baseline so it does not begin at zero. The baseline must not invent a historical cooking date or automatically count as a current-month event.
 - A newly saved recipe with a finished-dish photo should create one cooking event after the recipe save succeeds. A recipe without that photo does not receive this automatic event.
 - The same recipe may add at most one made count per local calendar day. Rankings must use real cooking events and support month and year aggregation; they must not rely on a permanently incremented recipe field.

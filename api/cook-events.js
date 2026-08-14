@@ -36,7 +36,8 @@ module.exports = async function handler(requestMessage, response) {
       const recipe = recipes.find(item => String(item.id) === String(recipeId))
       if (!recipe) return sendJson(response, 403, { error: '无权查看这道菜的做菜记录' })
       const detailEvents = visibleEvents.filter(event => String(event.recipe_id) === String(recipeId))
-      return sendJson(response, 200, { events: detailEvents, count: detailEvents.length, lastCookedOn: detailEvents[0]?.cooked_on || null })
+      const today = madridDate()
+      return sendJson(response, 200, { events: detailEvents, count: detailEvents.length, lastCookedOn: detailEvents[0]?.cooked_on || null, todayRecorded: detailEvents.some(event => event.cooked_on === today) })
     }
     const month = madridDate().slice(0, 7)
     const rankings = buildMonthlyRanking(recipes, visibleEvents, month)
