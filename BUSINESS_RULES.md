@@ -54,6 +54,13 @@
 - 删除菜谱或图片不得留下误删风险。当前自动清理接口是 dry-run，线上 Storage 删除保持暂停，必须先确认引用关系。
 - 清理候选必须排除所有菜谱主图、做菜记录图和历史图片引用；新上传文件至少保留 24 小时。
 
+## Future cooking-event rules (design only)
+
+- When cooking events are introduced in a separately approved phase, every valid existing recipe must receive one auditable initial made baseline so it does not begin at zero. The baseline must not invent a historical cooking date or automatically count as a current-month event.
+- A newly saved recipe with a finished-dish photo should create one cooking event after the recipe save succeeds. A recipe without that photo does not receive this automatic event.
+- The same recipe may add at most one made count per local calendar day. Rankings must use real cooking events and support month and year aggregation; they must not rely on a permanently incremented recipe field.
+- This Phase 7.1 entry records the future business rule only. It does not add events, counters, schema, migrations, or ranking data.
+
 ## 缓存与同步
 
 ## 长期登录规则（2026-07-18）

@@ -175,7 +175,7 @@ let recipes = []
 
 let activeCategory = '全部'
 let activeScope = 'mine'
-let homeListExpanded = false
+let homeView = 'home'
 let query = ''
 let selectedId = null
 let page = 'home'
@@ -342,17 +342,14 @@ function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
   const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
-  const isDefaultHome = page === 'home' && !viewingMember && activeScope === 'mine' && activeCategory === '全部' && !query.trim() && !homeListExpanded
-  const visibleRecipes = isDefaultHome ? filtered.slice(0, 6) : filtered
-  const shouldShowMore = isDefaultHome && filtered.length > visibleRecipes.length
-  const leaderboard = isDefaultHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
-      <div><span class="home-leaderboard-kicker">FAMILY TABLE</span><h2>本月家里最常做</h2></div>
-      <p>开始记录做菜次数后，这里会出现本月排行榜。</p>
+  const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && activeScope === 'mine' && activeCategory === '全部' && !query.trim()
+  const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
+  const leaderboard = isCompactHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
+      <div><h2>本月家里最常做</h2><p>排行榜将在做菜记录启用后自动生成</p></div>
     </section>` : ''
-  const more = shouldShowMore ? `<button class="home-show-more" type="button" data-action="expand-home-list">查看全部菜谱 <span>${filtered.length} 道</span></button>` : ''
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
-    ${visibleRecipes.length ? `${leaderboard}${more}` : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
+    ${visibleRecipes.length ? leaderboard : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
 }
 
 function homeTemplate() {
@@ -363,7 +360,7 @@ function homeTemplate() {
         ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
-      ${statsTemplate()}
+      <div class="home-scope-controls">${statsTemplate()}${currentUser?.role === 'guest' ? '' : (homeView === 'library' ? '<button class="home-library-entry" type="button" data-action="return-compact-home">← 返回首页</button>' : `<button class="home-library-entry" type="button" data-action="open-library">全部菜谱 <span>${homeStats().mine}</span></button>`)}</div>
       <div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
@@ -1177,11 +1174,15 @@ function updateSearchResults() {
   preloadHomeImages().catch(() => null)
 }
 
-function centerActiveCategory() {
+function syncActiveCategoryPosition() {
   const navigation = document.querySelector('.category-nav')
   const active = navigation?.querySelector('.active')
   if (!navigation || !active) return
-  navigation.scrollLeft = Math.max(0, active.offsetLeft - (navigation.clientWidth - active.offsetWidth) / 2)
+  if (activeCategory === '全部') {
+    navigation.scrollLeft = 0
+    return
+  }
+  active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
 function openNoteEditor(noteId = null) {
@@ -1533,7 +1534,14 @@ async function checkAccess() {
 root.addEventListener('input', event => {
   if (event.target.id === 'search') {
     query = event.target.value
-    if (!searchIsComposing && !event.isComposing) updateSearchResults()
+    if (!searchIsComposing && !event.isComposing) {
+      if (query.trim() && homeView !== 'library') {
+        homeView = 'library'
+        render(true)
+        return
+      }
+      updateSearchResults()
+    }
   }
   if (event.target.dataset.draft && draft) {
     draft[event.target.dataset.draft] = event.target.value
@@ -1587,6 +1595,12 @@ root.addEventListener('compositionupdate', event => {
 root.addEventListener('compositionend', event => {
   if (event.target.id !== 'search') return
   query = event.target.value
+  if (query.trim() && homeView !== 'library') {
+    homeView = 'library'
+    searchIsComposing = false
+    render(true)
+    return
+  }
   searchIsComposing = false
   updateSearchResults()
 })
@@ -1706,8 +1720,8 @@ root.addEventListener('click', async event => {
     render()
     initSupabaseSessionBridge().catch(() => null)
   }
-  if (target.dataset.category) { activeCategory = target.dataset.category; homeListExpanded = false; settingsMenuOpen = false; render(); return }
-  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; homeListExpanded = false; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
+  if (target.dataset.category) { activeCategory = target.dataset.category; homeView = 'library'; settingsMenuOpen = false; render(); return }
+  if (target.dataset.scope) { activeScope = target.dataset.scope; viewingMember = null; homeView = 'library'; settingsMenuOpen = false; activeCategory = '全部'; render(); return }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
   if (target.dataset.recipe) { openRecipe(target.dataset.recipe); return }
   if (target.dataset.draftCategory) { if (!draft || draftBusy || draftImageBusy) return; syncDraftFields(); const category = target.dataset.draftCategory; draft.categories = draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category]; draftDirty = true; render(); return }
@@ -1756,7 +1770,8 @@ root.addEventListener('click', async event => {
   if (action === 'save-cook-record') { saveCookRecord(); return }
   if (action === 'choose-cook-image') { document.getElementById('cook-file-input')?.click(); return }
   if (action === 'new-recipe') { startNewRecipe(); return }
-  if (action === 'expand-home-list') { homeListExpanded = true; render(); return }
+  if (action === 'open-library') { homeView = 'library'; settingsMenuOpen = false; render(); return }
+  if (action === 'return-compact-home') { activeScope = 'mine'; activeCategory = '全部'; query = ''; homeView = 'home'; settingsMenuOpen = false; render(); return }
   if (action === 'toggle-theme') { toggleTheme(); return }
   if (action === 'share-url') {
     try {
@@ -2108,7 +2123,7 @@ function render(preserveFocus = false) {
   if (preserveFocus) { const input = document.getElementById('search'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length) }
   if (imagePreview) setupImagePreviewInteractions()
   if (page === 'home') requestAnimationFrame(() => {
-    centerActiveCategory()
+    syncActiveCategoryPosition()
     setupPullToRefresh()
     preloadHomeImages().catch(() => null)
   })

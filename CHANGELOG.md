@@ -143,3 +143,10 @@
 - Added the six-recipe default home preview, a non-data-backed monthly ranking empty state, and a simple expand-to-all entry.
 - Moved theme and share actions into the existing menu, kept member management admin-only there, and removed only the home navigation entry for the porridge category.
 - Updated warm light and dark theme tokens without changing recipe data, authentication, storage, caching, or API behavior.
+
+## 2026-08-14 - Home redesign Phase 7.1
+- Replaced the inline home-list expansion with explicit compact HOME and full LIBRARY display states, keeping the six-recipe home and ranking preparation block together.
+- Reset the default category strip to its leftmost `全部` position and removed inherited centering/snap behavior that could start the strip midway through its categories.
+- Compressed recipe card titles to one left-aligned ellipsized line and reduced the title-area padding while preserving the shared 4:3 image presentation.
+- Reduced light and dark surface color weight through existing theme tokens; no recipe data, authentication, image cache, storage, or Service Worker behavior changed.
+- Recorded future cooking-event rules only. No ranking data, events, database schema, or migrations were created.
