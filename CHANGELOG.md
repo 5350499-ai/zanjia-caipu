@@ -161,3 +161,8 @@
 - Simplified recipe details by removing the duplicate copy action and the default comments section while retaining legacy comment APIs/data.
 - Moved favorite to the family-sharing status card and reduced the image-to-ingredients gap.
 - Replaced the default cooking-record editor with a one-tap “今天做了这道菜 +1” completion action backed by the existing cook-event API and daily duplicate protection.
+
+## 2026-08-14 - Home redesign Phase 7.4
+- Confirmed image-backed recipe creation keeps its first cooking event after the recipe save succeeds; the existing server baseline constraint remains the idempotency guard.
+- Expanded the monthly home ranking presentation and query result to Top 10 without changing its ordering rules.
+- Added server-side unreferenced-image deletion for explicit removal, replacement, recipe deletion, and edit-save rollback; dry-run orphan cleanup remains unchanged.

@@ -1,6 +1,7 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
 const { buildMonthlyRanking, countRecipeEvents, ensureImageBaseline, listFamilyEvents, madridDate } = require('../lib/cook-events')
+const { deleteImageIfUnreferenced } = require('../lib/storage-images')
 
 function mergeMaterialLines(...values) {
   const seen = new Set()
@@ -153,7 +154,7 @@ module.exports = async function handler(requestMessage, response) {
       body: JSON.stringify(row),
     })
     if (row.image_id) {
-      await ensureImageBaseline({ id: row.id, image_id: row.image_id, family_id: row.family_id })
+      await ensureImageBaseline({ id: row.id, image_id: row.image_id, family_id: row.family_id, user_id: user.id })
       const summary = await countRecipeEvents(row.id)
       row.cook_count = summary.count
       row.last_cooked_at = summary.lastCookedAt
@@ -172,12 +173,20 @@ module.exports = async function handler(requestMessage, response) {
     const existing = id ? await findRecipe(id) : null
     if (!existing) return sendJson(response, 404, { error: 'Recipe not found' })
     if (!canEdit(user, existing)) return sendJson(response, 403, { error: '没有权限删除这个菜谱' })
+    const imageIds = [existing.image_id, ...(existing.cook_records || []).map(record => record?.imageId || record?.image_id)].filter(Boolean)
     await request('/rest/v1/recipes', {
       method: 'DELETE',
       query: `?id=eq.${encodeFilter(id)}`,
       headers: { Prefer: 'return=minimal' },
     })
-    return sendJson(response, 200, { ok: true })
+    const cleanupErrors = []
+    for (const imageId of imageIds) {
+      try { await deleteImageIfUnreferenced(imageId) } catch (error) {
+        console.error('recipe delete image cleanup failed', { recipeId: id, imageId, error: error.message })
+        cleanupErrors.push(imageId)
+      }
+    }
+    return sendJson(response, 200, { ok: true, cleanupPending: cleanupErrors.length > 0, cleanupErrors: cleanupErrors.length })
   }
 
   response.setHeader('Allow', 'GET, POST, DELETE')

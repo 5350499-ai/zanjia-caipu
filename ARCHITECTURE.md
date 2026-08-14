@@ -79,6 +79,10 @@ Supabase REST + Storage
 
 ## 材料统一兼容（2026-08-01）
 
+## Image lifecycle safety (Phase 7.4)
+
+Explicit image removal now calls the server-side `deleteImageIfUnreferenced` helper after the recipe reference has been persisted. The helper scans recipe main-image and legacy `cook_records` references before calling private Supabase Storage deletion. Recipe deletion performs the same check after deleting the row; failed cleanup is returned as a pending status and logged. The existing administrator orphan cleanup endpoint remains dry-run.
+
 - `recipes.ingredients` 是唯一对用户展示和写入的材料清单，食材与调味品按原顺序合并。
 - 数据库 `recipes.seasonings` 列暂时保留为空数组以兼容旧客户端；服务端读取和写入会对旧 payload 做精确去重合并。
 - `src/main.js` 的 `normalizeRecipe` 同样转换 localStorage、IndexedDB 和云端快照，避免旧缓存再次显示独立调料区或重复追加。

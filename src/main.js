@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -348,9 +348,9 @@ function recipePanelTemplate() {
   const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && compactScope && activeCategory === '全部' && !query.trim()
   const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
   const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
-  const rankingRows = monthlyRanking.slice(0, 5).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
+  const rankingRows = monthlyRanking.slice(0, 10).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
   const leaderboard = isCompactHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
-      <div class="home-leaderboard-heading"><h2>本月家里最常做</h2><span>Top 5</span></div>
+      <div class="home-leaderboard-heading"><h2>本月家里最常做</h2><span>Top 10</span></div>
       ${rankingRows || '<p class="home-leaderboard-empty">本月还没有做菜记录</p>'}
     </section>` : ''
   return `<div class="recipe-list">
@@ -691,6 +691,19 @@ async function removeStoredImage(imageId, version = '') {
     transaction.oncomplete = () => { database.close(); resolve() }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
   })
+}
+
+async function removeRemoteImageIfSafe(imageId, recipeId, version = '') {
+  if (!imageId) return { deleted: false }
+  try {
+    const result = await deleteCloudImage(imageId, recipeId)
+    if (result?.deleted) await removeStoredImage(imageId, version)
+    return result
+  } catch (error) {
+    console.error('recipe image cleanup failed', { imageId, recipeId, error: error.message })
+    window.alert('图片已从菜谱移除，但服务器旧文件清理失败，稍后可再次清理。')
+    return { cleanupPending: true }
+  }
 }
 
 async function clearIndexedDBCache() {
@@ -1100,14 +1113,17 @@ async function saveRecipe() {
     await persistSingleRecipe(recipe)
   } catch (error) {
     recipes = previousRecipes
-    if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+    if (uploadedImageId) {
+      if (isEditing) await removeRemoteImageIfSafe(uploadedImageId, id, uploadedImageVersion)
+      else await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+    }
     window.alert('菜谱保存失败，原图片已保留。')
     draftBusy = false
     render()
     return
   }
   if ((imageFile || draftRef.removeImage) && oldImageId && oldImageId !== imageId) {
-    await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
+    await removeRemoteImageIfSafe(oldImageId, id, oldImageVersion)
     if (current?.image?.startsWith('blob:') && current.image !== draftRef.image) URL.revokeObjectURL(current.image)
   }
   if (!isEditing) touchRecipeOpen(id)
@@ -1127,7 +1143,8 @@ async function deleteCurrentRecipe() {
   const current = findRecipeById(recipeId)
   if (!current) return
   try {
-    await deleteCloudRecipe(recipeId)
+    const result = await deleteCloudRecipe(recipeId)
+    if (result?.cleanupPending) window.alert('菜谱已删除，但服务器旧图片清理失败，稍后可再次清理。')
   } catch (error) {
     window.alert('菜谱删除失败，图片和数据已保留。')
     return
@@ -1713,12 +1730,12 @@ root.addEventListener('change', async event => {
         await persistSingleRecipe(updatedRecipe)
       } catch (error) {
         recipes = previousRecipes
-        await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
+        await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion)
         window.alert('菜谱保存失败，原图片已保留。')
         render()
         return
       }
-      if (oldImageId && oldImageId !== imageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
+      if (oldImageId && oldImageId !== imageId) await removeRemoteImageIfSafe(oldImageId, uploadRecipeId, oldImageVersion)
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
       render()
     } catch (error) {
@@ -1955,7 +1972,7 @@ root.addEventListener('click', async event => {
       render()
       return
     }
-    if (oldImageId) await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
+    if (oldImageId) await removeRemoteImageIfSafe(oldImageId, selectedId, oldImageVersion)
     if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
     imageMenu = false
     render()

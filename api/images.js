@@ -1,6 +1,6 @@
 const { request } = require('../lib/supabase-server')
 const { getSessionUser, readBuffer, sendJson } = require('../lib/server-auth')
-const { downloadStorageImage, listStorageImageDetails, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
+const { deleteImageIfUnreferenced, downloadStorageImage, listStorageImageDetails, listStorageImages, uploadStorageImage } = require('../lib/storage-images')
 
 async function findImageRecipe(imageId) {
   const rows = await request('/rest/v1/recipes', {
@@ -175,6 +175,19 @@ module.exports = async function handler(requestMessage, response) {
   }
 
   if (requestMessage.method === 'DELETE') {
+    const recipeId = url.searchParams.get('recipeId')
+    const authorizedRecipe = recipeId
+      ? (await request('/rest/v1/recipes', { query: `?id=eq.${encodeURIComponent(recipeId)}&select=id,author_user_id,family_id,is_family_shared,cook_records` }))?.[0]
+      : recipe
+    if (!authorizedRecipe && user.role !== 'admin') return sendJson(response, 403, { error: '无权删除这张图片' })
+    if (authorizedRecipe && !canWrite(user, authorizedRecipe)) return sendJson(response, 403, { error: '无权删除这张图片' })
+    try {
+      const result = await deleteImageIfUnreferenced(imageId)
+      return sendJson(response, 200, { ok: true, ...result, message: result.deleted ? '图片已从服务器删除' : '图片仍被其他记录引用，未删除服务器文件' })
+    } catch (error) {
+      console.error('recipe image storage cleanup failed', { imageId, recipeId, error: error.message })
+      return sendJson(response, 503, { ok: false, cleanupPending: true, error: '图片已从菜谱移除，但服务器旧文件清理失败，稍后可再次清理。' })
+    }
     if (!canWrite(user, recipe)) return sendJson(response, 403, { error: '没有权限删除这张图片' })
     return sendJson(response, 200, { ok: true, skipped: true, message: 'Storage 删除已暂停，未删除图片。' })
   }
