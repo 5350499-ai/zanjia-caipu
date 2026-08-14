@@ -28,4 +28,9 @@ button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2p
 button:disabled,
 .button:disabled { cursor: default; opacity: .58; }
 .image-frame { width: 100%; max-width: 100%; overflow: hidden; aspect-ratio: var(--ratio-recipe-card); border-radius: var(--radius-md); }
-.image-frame > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.image-frame > img { display: block; width: 100%; height: 100%; object-fit: var(--image-fit-cover); object-position: var(--image-position-center); }
+.image-frame-cover,
+.image-frame-card,
+.image-frame-record { aspect-ratio: var(--ratio-recipe-card); object-fit: var(--image-fit-cover); object-position: var(--image-position-center); }
+.image-frame-contain,
+.image-frame-lightbox { object-fit: var(--image-fit-contain); object-position: var(--image-position-center); }

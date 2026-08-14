@@ -134,3 +134,6 @@
 ## 2026-08-14 - UI root Phase 5
 - Added responsive width, min-width, max-width, date-control, safe-area, and compact/wide phone primitives without changing page structure or business behavior.
 - Kept existing responsive page rules and image ratios intact; no home redesign was introduced.
+## 2026-08-14 - UI root Phase 6
+- Added shared image-frame tokens and adapters for 4:3 cover presentation, placeholders, record images, and fixed-width growth thumbnails.
+- Kept lightbox contain behavior and all image storage, caching, upload, deletion, and touch logic unchanged.

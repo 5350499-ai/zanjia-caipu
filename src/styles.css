@@ -67,7 +67,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .recipe-list { display: grid; gap: 14px; }
 .recipe-card { overflow: hidden; position: relative; background: #fff; border: 1px solid #ddd6ca; border-radius: 5px; box-shadow: 0 5px 18px rgba(54, 42, 27, .06); cursor: pointer; }
 .recipe-card::after { content: ""; position: absolute; top: 0; right: 0; width: 25px; height: 25px; background: linear-gradient(225deg, #9c3d2d 0 49%, transparent 50%); opacity: .9; }
-.image-area { width: 100%; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 0; padding: 0; }
+.image-area { width: 100%; aspect-ratio: var(--ratio-recipe-card); display: flex; flex-direction: column; justify-content: center; align-items: center; border: 0; padding: 0; }
 .image-area.placeholder { gap: 6px; background: #dedbd5; color: #777169; cursor: pointer; }
 .image-area.placeholder.compact { gap: 4px; }
 .image-area.placeholder strong { font-size: 16px; letter-spacing: .03em; }
@@ -151,7 +151,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .form-control.invalid { border-color: #bd3828; background: #fff7f5; }
 textarea.form-control { min-height: 94px; resize: vertical; }
 textarea.form-control.tall { min-height: 130px; }
-.form-photo { overflow: hidden; position: relative; width: 100%; aspect-ratio: 4 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px dashed #aaa298; border-radius: 5px; background: #dedbd5; color: #746e66; }
+.form-photo { overflow: hidden; position: relative; width: 100%; aspect-ratio: var(--ratio-form-photo); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px dashed #aaa298; border-radius: 5px; background: #dedbd5; color: #746e66; }
 .form-photo small { color: #8d867e; }
 .form-photo.has-image { display: block; padding: 0; border: 0; }
 .form-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; border-radius: inherit; }
@@ -276,18 +276,18 @@ textarea.form-control.tall { min-height: 130px; }
 .member-actions button { min-height: 38px; padding: 0 10px; border: 0; border-radius: 9px; color: #5f564d; background: #eee9df; font-size: 14px; font-weight: 750; }
 .member-actions button.danger-text { color: #ad3b2b; background: #f7e8e4; }
 .cook-editor select { width: 100%; min-height: 50px; padding: 0 12px; border: 1px solid #d4ccbf; border-radius: 4px; color: #2d2822; background: #fbfaf7; font-size: 17px; }
-.record-photo { overflow: hidden; width: 100%; aspect-ratio: 4 / 3; display: grid; place-items: center; border: 1px dashed #c8bfb4; border-radius: 14px; background: #f3f1ed; color: #777169; }
+.record-photo { overflow: hidden; width: 100%; aspect-ratio: var(--ratio-record-photo); display: grid; place-items: center; border: 1px dashed #c8bfb4; border-radius: 14px; background: #f3f1ed; color: #777169; }
 .record-photo.has-image { position: relative; display: block; border: 0; }
 .record-photo img { width: 100%; height: 100%; object-fit: cover; }
 .record-photo span:not(.placeholder-plus) { position: absolute; right: 10px; bottom: 10px; padding: 7px 10px; border-radius: 999px; color: #fff; background: rgba(32,28,24,.68); font-size: 13px; font-weight: 800; }
 .growth-strip { display: flex; gap: 8px; margin: 0 0 16px; overflow-x: auto; }
-.growth-strip img { flex: 0 0 96px; width: 96px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; }
+.growth-strip img { flex: 0 0 96px; width: 96px; aspect-ratio: var(--ratio-record-photo); object-fit: var(--image-fit-cover); border-radius: 12px; }
 .cook-record-list { display: grid; gap: 10px; }
 .cook-record { padding: 12px; border-radius: 14px; background: #fff; box-shadow: 0 3px 13px rgba(49,40,30,.04); }
 .cook-record > div { display: flex; justify-content: space-between; gap: 8px; color: #9a766e; font-size: 13px; font-weight: 800; }
 .cook-record-head { align-items: center; flex-wrap: wrap; }
 .cook-record-head .note-actions { margin-left: auto; }
-.cook-record img { width: 100%; margin-top: 10px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; }
+.cook-record img { width: 100%; margin-top: 10px; aspect-ratio: var(--ratio-record-photo); object-fit: var(--image-fit-cover); border-radius: 12px; }
 .cook-record p { margin: 9px 0 0; font-size: 16px; line-height: 1.55; }
 
 /* First visual refinement */
@@ -1344,6 +1344,39 @@ body {
 }
 
 .form-bottom-actions { box-shadow: var(--shadow-bottom-bar); }
+
+/* Phase 6 image adapters: one display contract, without touching image data or events. */
+.image-area,
+.form-photo,
+.record-photo,
+.cook-record img {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.image-area img,
+.form-photo img,
+.record-photo img,
+.cook-record img,
+.growth-strip img {
+  display: block;
+  max-width: 100%;
+  object-fit: var(--image-fit-cover);
+  object-position: var(--image-position-center);
+}
+
+.image-area.has-image,
+.form-photo.has-image,
+.record-photo.has-image {
+  overflow: hidden;
+}
+
+.image-area.placeholder,
+.form-photo.placeholder,
+.record-photo.placeholder {
+  background: var(--color-surface-muted);
+}
 
 /* Phase 5 responsive adapters: constrain existing layouts without changing structure. */
 html,

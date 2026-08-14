@@ -54,6 +54,9 @@
   --ratio-recipe-card: 4 / 3;
   --ratio-form-photo: 4 / 3;
   --ratio-record-photo: 4 / 3;
+  --image-fit-cover: cover;
+  --image-fit-contain: contain;
+  --image-position-center: center;
   --border-width-default: 1px;
   --border-width-strong: 2px;
   --shadow-card: 0 4px 15px rgba(50, 40, 30, .055);
