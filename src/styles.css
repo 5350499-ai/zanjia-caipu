@@ -1268,3 +1268,47 @@ body {
 :root[data-theme="dark"] .settings-popover button:active {
   background: color-mix(in srgb, var(--card) 84%, var(--bg));
 }
+
+/* Phase 3 adapters: existing business selectors share the root control behavior. */
+.top-add-button,
+.header-save,
+.header-edit,
+.global-icon-button,
+.secondary-mini-button,
+.primary-button,
+.secondary-button,
+.delete-recipe-button,
+.confirm-delete-button,
+.guest-login-button,
+.settings-button,
+.notes-toolbar button,
+.note-actions button,
+.member-actions button,
+.detail-quick-actions button,
+.logout-button {
+  font-family: var(--font-family-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.search-box input,
+.form-control,
+.note-editor input,
+.note-editor textarea,
+.cook-editor select,
+.auth-card input,
+.comment-form input,
+.comment-form textarea {
+  font-family: var(--font-family-sans);
+  caret-color: var(--caret-color);
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.share-switch i {
+  background: var(--color-switch-off);
+}
+
+.share-switch input:checked + i {
+  background: var(--color-brand);
+}

@@ -125,3 +125,6 @@
 ## 2026-08-14 - UI root Phase 2
 - Connected selected typography and repeated theme colors to the Phase 1 token layer without changing page structure or business behavior.
 - Kept legacy page-specific CSS and source-text encoding debt unchanged for later phases.
+## 2026-08-14 - UI root Phase 3
+- Added shared button behavior and form-control foundations, then connected existing business selectors through lightweight CSS adapters.
+- Preserved existing dimensions, page structure, interaction logic, and legacy business-specific styles.

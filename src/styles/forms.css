@@ -15,7 +15,10 @@ select {
   color: var(--color-text-primary);
   background: var(--color-surface-input);
   border-color: var(--color-border);
+  font-family: var(--font-family-sans);
+  line-height: var(--line-height-normal);
   font-size: var(--font-size-control);
+  caret-color: var(--caret-color);
 }
 
 input::placeholder,
@@ -27,4 +30,22 @@ input[type="date"] {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+
+input[type="search"],
+input[type="date"],
+input[type="text"],
+input[type="password"],
+textarea,
+select,
+.form-control {
+  -webkit-text-fill-color: var(--input-text);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled,
+.form-control:disabled {
+  cursor: default;
+  opacity: .62;
 }
