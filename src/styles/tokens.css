@@ -48,6 +48,9 @@
   --page-padding-inline: 16px;
   --page-padding-block: 16px;
   --content-gap: 12px;
+  --page-padding-inline-fluid: clamp(12px, 4vw, 18px);
+  --breakpoint-compact: 360px;
+  --breakpoint-wide-phone: 420px;
   --ratio-recipe-card: 4 / 3;
   --ratio-form-photo: 4 / 3;
   --ratio-record-photo: 4 / 3;
