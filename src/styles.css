@@ -466,7 +466,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 .detail-content > .image-area + .hidden-input + .recipe-section { margin-top: 24px; border-top: 0; }
 .recipe-section-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 17px; }
 .recipe-section-title > span { color: #a05245; font: italic 13px Georgia, serif; }
-.recipe-section-title h2 { margin: 0; color: #24201c; font: 800 23px/1.2 Georgia, "Songti SC", serif; letter-spacing: -.02em; }
+.recipe-section-title h2 { margin: 0; color: #24201c; font: var(--font-weight-bold) var(--font-size-section-title)/1.2 var(--font-family-display); letter-spacing: -.02em; }
 .recipe-section-body { color: #39342e; }
 .simple-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .simple-list li { position: relative; padding-left: 19px; font-size: 17px; line-height: 1.55; }
@@ -474,7 +474,7 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 .steps { gap: 12px; }
 .steps li { padding: 14px 14px 14px 12px; grid-template-columns: 34px minmax(0, 1fr); align-items: start; border-radius: 14px; background: #fff; box-shadow: 0 3px 13px rgba(49, 40, 30, .045); }
 .steps li > span { width: 32px; height: 32px; margin-top: 1px; background: #99483b; font-size: 15px; }
-.steps p { margin-top: 1px; color: #28241f; font-size: 18px; font-weight: 560; line-height: 1.7; }
+.steps p { margin-top: 1px; color: #28241f; font-size: var(--font-size-step); font-weight: 560; line-height: 1.7; }
 .recipe-section .body-copy { margin: 0; font-size: 17px; line-height: 1.8; }
 .notes-section { padding-bottom: 8px; }
 .notes-toolbar { margin-top: -52px; margin-bottom: 22px; }
@@ -521,7 +521,8 @@ body { background: #e8e6e1; -webkit-tap-highlight-color: transparent; }
 }
 
 .brand-row h1 {
-  font-size: 24px;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-brand);
 }
 
 .account-subtitle {
@@ -705,8 +706,8 @@ body.menu-open {
 }
 
 .card-content h3 {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-card-title);
+  font-weight: var(--font-weight-card-title);
   line-height: 1.3;
 }
 
@@ -714,7 +715,7 @@ body.menu-open {
   flex-direction: column;
   gap: 7px;
   color: #74747b;
-  background: #f1f1f3;
+  background: var(--color-surface-subtle);
 }
 
 .recipe-card .image-area.placeholder strong {
@@ -1140,13 +1141,13 @@ body {
 }
 
 :root[data-theme="dark"] .category-picker button {
-  background: #2b2622;
+  background: var(--color-surface-subtle);
   border-color: #5a5048;
   color: #e9e2d9;
 }
 
 :root[data-theme="dark"] .recipe-form .category-picker button {
-  background: #2b2622;
+  background: var(--color-surface-subtle);
   border-color: #5a5048;
   color: #e9e2d9;
 }
@@ -1154,13 +1155,13 @@ body {
 :root[data-theme="dark"] .category-picker button.selected {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 :root[data-theme="dark"] .recipe-form .category-picker button.selected {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 :root[data-theme="dark"] .share-toggle {
@@ -1172,7 +1173,7 @@ body {
 }
 
 :root[data-theme="dark"] .share-toggle input + i {
-  background: #4c443d;
+  background: var(--color-switch-off);
 }
 
 :root[data-theme="dark"] .share-toggle input:checked + i {
@@ -1186,7 +1187,7 @@ body {
 :root[data-theme="dark"] .form-photo.placeholder,
 :root[data-theme="dark"] .recipe-card .image-area.placeholder,
 :root[data-theme="dark"] .record-photo.placeholder {
-  background: #2b2622;
+  background: var(--color-surface-subtle);
   color: #e9e2d9;
   border-color: #5a5048;
 }
@@ -1197,9 +1198,9 @@ body {
 }
 
 :root[data-theme="dark"] .form-section .remove-form-photo {
-  border-color: #6a4a43;
-  color: #d97a6a;
-  background: #2b2622;
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+  background: var(--color-surface-subtle);
 }
 
 :root[data-theme="dark"] .form-section .remove-form-photo:active {

@@ -11,6 +11,14 @@
   --font-size-caption: 12px;
   --font-size-button: 16px;
   --font-size-control: 16px;
+  --font-size-page-title: 30px;
+  --font-size-section-title: 23px;
+  --font-size-card-title: 16px;
+  --font-size-body-large: 18px;
+  --font-size-meta: 13px;
+  --font-size-brand: 24px;
+  --font-size-step: 18px;
+  --font-weight-card-title: 700;
   --font-weight-regular: 400;
   --font-weight-medium: 600;
   --font-weight-semibold: 700;

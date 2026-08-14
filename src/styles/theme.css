@@ -26,6 +26,11 @@
   --color-border: var(--border);
   --color-divider: var(--border);
   --color-overlay: rgba(24, 21, 18, .45);
+  --color-surface-subtle: #f1f1f3;
+  --color-on-brand: #fff;
+  --color-danger-surface: #fff5f3;
+  --color-danger-border: #e4b9b2;
+  --color-switch-off: #ded8cf;
 }
 
 :root[data-theme="dark"] {
@@ -55,4 +60,9 @@
   --color-border: var(--border);
   --color-divider: var(--border);
   --color-overlay: rgba(0, 0, 0, .56);
+  --color-surface-subtle: #2b2622;
+  --color-on-brand: #fff;
+  --color-danger-surface: #352722;
+  --color-danger-border: #8a4339;
+  --color-switch-off: #4c443d;
 }

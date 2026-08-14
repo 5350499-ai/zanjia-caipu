@@ -122,3 +122,6 @@
 
 - 新增和编辑页面的图片预览统一使用 `object-fit: cover` 并铺满 4:3 预览框。
 - 深色模式下“删除图片”改为深色危险按钮样式。
+## 2026-08-14 - UI root Phase 2
+- Connected selected typography and repeated theme colors to the Phase 1 token layer without changing page structure or business behavior.
+- Kept legacy page-specific CSS and source-text encoding debt unchanged for later phases.
