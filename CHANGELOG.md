@@ -170,3 +170,4 @@
 
 - Treat the first successful image added to a recipe with zero cook events as the idempotent first cook event, including recipes created without an image.
 - Keep historical image baselines out of the daily manual-cook lock while retaining them for totals and rankings.
+- 2026-08-15: Audited and repaired 64 `initial_image_baseline` dates from auditable Storage object creation dates; documented immutable first-image event dates and preserved all event identity/source/user fields.

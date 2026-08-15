@@ -95,3 +95,4 @@
 - 图片缓存键使用稳定的 `imageId + imageVersion`，有效图片不自动过期或自动清理；只有图片更换、路径/版本变化、本地缓存不存在或用户主动清除缓存时才重新下载。
 - 设置菜单中的“清除本地缓存”只清除当前设备菜谱快照、打开顺序、IndexedDB 图片、图片响应缓存和旧静态资源缓存，保留登录状态，不删除服务器菜谱或 Supabase Storage 图片，完成后重新同步服务器数据。
 - 管理员设置菜单可查看当前 `recipe-images` bucket 的图片数量和扫描到的总容量；若配置 `SUPABASE_STORAGE_CAPACITY_BYTES`，达到 70% 会提示管理员；当前不执行自动迁移或自动删除。
+- First-image cooking dates are immutable: the first successful finished-dish image binding uses the Europe/Madrid local date, and later image replacement, deletion, or re-upload never changes that event.
