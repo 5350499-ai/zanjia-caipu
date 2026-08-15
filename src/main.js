@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -178,6 +178,14 @@ let activeScope = 'mine'
 let homeView = 'home'
 let query = ''
 let monthlyRanking = []
+let rankingPeriod = 'all'
+let rankingYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date()))
+let rankingMonth = Number(new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', month: 'numeric' }).format(new Date()))
+let familyStatsPeriod = 'month'
+let familyStatsYear = rankingYear
+let familyStatsMonth = rankingMonth
+let familyStats = { visible: false, members: [] }
+let familyStatsLoading = false
 let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
 let page = 'home'
@@ -340,6 +348,45 @@ function installGlobalErrorHandlers() {
   }
 }
 
+function periodLabel(period, year, month) {
+  if (period === 'all') return '总计'
+  return period === 'year' ? `${year}年` : `${year}年${month}月`
+}
+
+function shortMemberName(name) {
+  return String(name || '').replace(/菜谱$/, '')
+}
+
+function familyStatsTemplate() {
+  if (currentUser?.role === 'guest' || !familyStats.visible) return ''
+  const rows = Array.isArray(familyStats.members) ? familyStats.members : []
+  const maxCook = Math.max(1, ...rows.map(row => Number(row.cookCount) || 0))
+  const maxRecipe = Math.max(1, ...rows.map(row => Number(row.recipeCount) || 0))
+  const tabs = [['month', '本月'], ['year', '本年'], ['all', '总计']].map(([value, label]) => `<button type="button" class="stats-period-tab ${familyStatsPeriod === value ? 'active' : ''}" data-stats-period="${value}">${label}</button>`).join('')
+  const now = currentMadridParts()
+  const canNext = familyStatsPeriod === 'month' ? !(familyStatsYear > now.year || (familyStatsYear === now.year && familyStatsMonth >= now.month)) : !(familyStatsPeriod === 'year' && familyStatsYear >= now.year)
+  const periodNav = familyStatsPeriod === 'all' ? '' : `<div class="stats-period-nav"><button type="button" data-action="family-stats-prev" aria-label="上一个">‹</button><strong>${periodLabel(familyStatsPeriod, familyStatsYear, familyStatsMonth)}</strong><button type="button" data-action="family-stats-next" aria-label="下一个" ${canNext ? '' : 'disabled'}>›</button></div>`
+  const bars = rows.map((row, index) => {
+    const cook = Number(row.cookCount) || 0
+    const recipe = Number(row.recipeCount) || 0
+    const cookHeight = cook ? Math.max(12, Math.round((cook / maxCook) * 100)) : 0
+    const recipeHeight = recipe ? Math.max(12, Math.round((recipe / maxRecipe) * 100)) : 0
+    return `<div class="member-stat" data-member-index="${index}"><div class="member-stat-values"><span>${cook}</span><span>${recipe}</span></div><div class="member-stat-bars"><i class="member-bar cook" style="--bar-height:${cookHeight}%"></i><i class="member-bar recipe" style="--bar-height:${recipeHeight}%"></i></div><strong>${escapeHtml(shortMemberName(row.name))}</strong></div>`
+  }).join('')
+  return `<section class="family-stats-panel" aria-label="咱家做饭记录"><div class="family-stats-heading"><h2>咱家做饭记录</h2>${periodNav}</div><div class="stats-period-tabs">${tabs}</div><div class="member-stat-chart">${bars}</div><div class="member-stat-legend"><span><i class="legend-dot cook"></i>做菜次数</span><span><i class="legend-dot recipe"></i>新增菜谱</span></div></section>`
+}
+
+function rankingTemplate() {
+  const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
+  const label = periodLabel(rankingPeriod, rankingYear, rankingMonth)
+  const now = currentMadridParts()
+  const canNext = rankingPeriod === 'month' ? !(rankingYear > now.year || (rankingYear === now.year && rankingMonth >= now.month)) : !(rankingPeriod === 'year' && rankingYear >= now.year)
+  const nav = rankingPeriod === 'all' ? '' : `<div class="ranking-period-nav"><button type="button" data-action="ranking-prev" aria-label="上一个">‹</button><strong>${label}</strong><button type="button" data-action="ranking-next" aria-label="下一个" ${canNext ? '' : 'disabled'}>›</button></div>`
+  const tabs = [['all', '总计'], ['year', '本年'], ['month', '本月']].map(([value, text]) => `<button type="button" class="ranking-period-tab ${rankingPeriod === value ? 'active' : ''}" data-ranking-period="${value}">${text}</button>`).join('')
+  const rankingRows = monthlyRanking.slice(0, 10).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
+  return `<section class="home-leaderboard" aria-label="家里最常做"><div class="home-leaderboard-heading"><h2>家里最常做</h2>${nav}</div><div class="ranking-period-tabs">${tabs}</div>${rankingRows || '<p class="home-leaderboard-empty">暂无做菜记录</p>'}</section>`
+}
+
 function recipePanelTemplate() {
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
@@ -347,12 +394,7 @@ function recipePanelTemplate() {
   const compactScope = currentUser?.role === 'guest' ? activeScope === 'shared' : activeScope === 'mine'
   const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && compactScope && activeCategory === '全部' && !query.trim()
   const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
-  const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
-  const rankingRows = monthlyRanking.slice(0, 10).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
-  const leaderboard = isCompactHome ? `<section class="home-leaderboard" aria-label="本月家里最常做">
-      <div class="home-leaderboard-heading"><h2>本月家里最常做</h2><span>Top 10</span></div>
-      ${rankingRows || '<p class="home-leaderboard-empty">本月还没有做菜记录</p>'}
-    </section>` : ''
+  const leaderboard = isCompactHome ? `${familyStatsTemplate()}${rankingTemplate()}` : ''
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${visibleRecipes.length ? leaderboard : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
@@ -885,7 +927,8 @@ async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
     const cloudRecipes = await loadCloudLibrary()
-    const nextMonthlyRanking = Array.isArray(window.__familyRecipeMonthlyRanking) ? window.__familyRecipeMonthlyRanking : []
+    const nextMonthlyRanking = Array.isArray(window.__familyRecipeRanking) ? window.__familyRecipeRanking : (Array.isArray(window.__familyRecipeMonthlyRanking) ? window.__familyRecipeMonthlyRanking : [])
+    const nextFamilyStats = window.__familyCookingStats || { visible: false, members: [] }
     if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
@@ -894,10 +937,11 @@ async function syncCloudLibrary({ force = false } = {}) {
       const currentImage = currentRecipeImages.get(String(recipe.id))
       if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
     })
-    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking)
+    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking) || JSON.stringify(familyStats) !== JSON.stringify(nextFamilyStats)
     const shouldRender = force || recipesChanged(syncedRecipes) || rankingChanged
     recipes = syncedRecipes
     monthlyRanking = nextMonthlyRanking
+    familyStats = nextFamilyStats
     const serializable = serializeRecipes()
     storageSet(userStorageKey(), JSON.stringify(serializable))
     writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
@@ -1194,6 +1238,7 @@ async function deleteCurrentRecipe() {
   deleteRecipePrompt = false
   page = 'home'
   history.replaceState({ appPage: 'home' }, '')
+  await syncCloudLibrary({ force: true })
   render()
 }
 
@@ -1806,7 +1851,7 @@ root.addEventListener('error', event => {
 }, true)
 
 root.addEventListener('click', async event => {
-  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
+  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) return
   const action = target.dataset.action
   if (target.classList.contains('settings-layer') && event.target instanceof Element && event.target.closest('.settings-popover')) return
@@ -1816,6 +1861,12 @@ root.addEventListener('click', async event => {
     initSupabaseSessionBridge().catch(() => null)
   }
   if (target.dataset.category) { activeCategory = target.dataset.category; homeView = 'library'; settingsMenuOpen = false; render(); return }
+  if (target.dataset.statsPeriod) { await setFamilyStatsPeriod(target.dataset.statsPeriod); return }
+  if (target.dataset.rankingPeriod) { await setRankingPeriod(target.dataset.rankingPeriod); return }
+  if (action === 'family-stats-prev') { await stepFamilyStatsPeriod(-1); return }
+  if (action === 'family-stats-next') { await stepFamilyStatsPeriod(1); return }
+  if (action === 'ranking-prev') { await stepRankingPeriod(-1); return }
+  if (action === 'ranking-next') { await stepRankingPeriod(1); return }
   if (target.dataset.scope) {
     const nextScope = target.dataset.scope
     if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
@@ -2243,6 +2294,76 @@ async function quickCookRecipe() {
   }
 }
 
+async function refreshFamilyStatsAndRanking() {
+  if (!cloudReady || currentUser?.role === 'guest') return
+  familyStatsLoading = true
+  render()
+  try {
+    const [statsData, rankingData] = await Promise.all([
+      loadCloudFamilyStats({ period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth }),
+      loadCloudRanking({ period: rankingPeriod, year: rankingYear, month: rankingMonth }),
+    ])
+    familyStats = statsData
+    monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
+  } catch (error) {
+    console.warn('统计刷新失败', error)
+  } finally {
+    familyStatsLoading = false
+    render()
+  }
+}
+
+function currentMadridParts() {
+  const parts = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', year: 'numeric', month: 'numeric' }).formatToParts(new Date())
+  return { year: Number(parts.find(part => part.type === 'year')?.value), month: Number(parts.find(part => part.type === 'month')?.value) }
+}
+
+async function setFamilyStatsPeriod(period) {
+  familyStatsPeriod = period
+  const now = currentMadridParts()
+  familyStatsYear = period === 'all' ? now.year : Math.min(familyStatsYear, now.year)
+  familyStatsMonth = Math.min(familyStatsMonth, familyStatsYear === now.year ? now.month : 12)
+  await refreshFamilyStatsAndRanking()
+}
+
+async function stepFamilyStatsPeriod(delta) {
+  if (familyStatsPeriod === 'all') return
+  if (familyStatsPeriod === 'year') familyStatsYear += delta
+  else {
+    familyStatsMonth += delta
+    if (familyStatsMonth < 1) { familyStatsMonth = 12; familyStatsYear -= 1 }
+    if (familyStatsMonth > 12) { familyStatsMonth = 1; familyStatsYear += 1 }
+  }
+  const now = currentMadridParts()
+  if (familyStatsYear > now.year || (familyStatsPeriod === 'month' && familyStatsYear === now.year && familyStatsMonth > now.month)) {
+    familyStatsYear = now.year; familyStatsMonth = now.month
+  }
+  await refreshFamilyStatsAndRanking()
+}
+
+async function setRankingPeriod(period) {
+  rankingPeriod = period
+  const now = currentMadridParts()
+  rankingYear = period === 'all' ? now.year : Math.min(rankingYear, now.year)
+  rankingMonth = Math.min(rankingMonth, rankingYear === now.year ? now.month : 12)
+  await refreshFamilyStatsAndRanking()
+}
+
+async function stepRankingPeriod(delta) {
+  if (rankingPeriod === 'all') return
+  if (rankingPeriod === 'year') rankingYear += delta
+  else {
+    rankingMonth += delta
+    if (rankingMonth < 1) { rankingMonth = 12; rankingYear -= 1 }
+    if (rankingMonth > 12) { rankingMonth = 1; rankingYear += 1 }
+  }
+  const now = currentMadridParts()
+  if (rankingYear > now.year || (rankingPeriod === 'month' && rankingYear === now.year && rankingMonth > now.month)) {
+    rankingYear = now.year; rankingMonth = now.month
+  }
+  await refreshFamilyStatsAndRanking()
+}
+
 function settingsMenuTemplate() {
   return settingsMenuTemplateRaw()
     .replace(/<button data-action="storage-stats">[\s\S]*?<\/button>/g, '')
@@ -2350,6 +2471,10 @@ function goHome(fromHistory = false) {
   settingsMenuOpen = false
   clearRecipeComments()
   page = 'home'
+  rankingPeriod = 'all'
+  familyStatsPeriod = 'month'
+  const now = currentMadridParts()
+  rankingYear = now.year; rankingMonth = now.month; familyStatsYear = now.year; familyStatsMonth = now.month
   render()
 }
 

@@ -63,4 +63,6 @@
   --shadow-raised: 0 8px 28px rgba(30, 22, 14, .08);
   --shadow-modal: 0 18px 60px rgba(18, 15, 12, .22);
   --shadow-bottom-bar: 0 -7px 24px rgba(48, 39, 29, .07);
+  --chart-bar-height: 168px;
+  --chart-bar-min-height: 12px;
 }

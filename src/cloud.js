@@ -8,7 +8,35 @@ export async function loadCloudLibrary() {
   const data = await response.json()
   window.__familyRecipeStats = data.stats || null
   window.__familyRecipeMonthlyRanking = Array.isArray(data.monthlyRanking) ? data.monthlyRanking : []
+  const [rankingResponse, statsResponse] = await Promise.all([
+    fetch('/api/cook-events?action=ranking&period=all', { credentials: 'same-origin', cache: 'no-store' }),
+    fetch('/api/cook-events?action=family-stats&period=month', { credentials: 'same-origin', cache: 'no-store' }),
+  ])
+  const rankingData = rankingResponse.ok ? await rankingResponse.json() : {}
+  const statsData = statsResponse.ok ? await statsResponse.json() : {}
+  window.__familyRecipeRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : window.__familyRecipeMonthlyRanking
+  window.__familyCookingStats = statsData
   return data.recipes || []
+}
+
+export async function loadCloudRanking({ period = 'all', year, month } = {}) {
+  const params = new URLSearchParams({ action: 'ranking', period })
+  if (year) params.set('year', String(year))
+  if (month) params.set('month', String(month))
+  const response = await fetch(`/api/cook-events?${params}`, { credentials: 'same-origin', cache: 'no-store' })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Ranking failed: ${response.status}`)
+  return data
+}
+
+export async function loadCloudFamilyStats({ period = 'month', year, month } = {}) {
+  const params = new URLSearchParams({ action: 'family-stats', period })
+  if (year) params.set('year', String(year))
+  if (month) params.set('month', String(month))
+  const response = await fetch(`/api/cook-events?${params}`, { credentials: 'same-origin', cache: 'no-store' })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Family stats failed: ${response.status}`)
+  return data
 }
 
 export async function createCloudCookEvent(recipeId, cookedOn) {

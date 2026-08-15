@@ -1811,8 +1811,40 @@ body,
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--color-brand);
+  background: linear-gradient(90deg, var(--color-brand), var(--color-accent-warm));
+  box-shadow: inset 0 1px 1px var(--chart-highlight), 0 1px 4px rgba(180, 88, 48, .16);
 }
+
+.ranking-period-tabs,
+.stats-period-tabs { display: flex; gap: 6px; margin-top: 10px; }
+.ranking-period-tab,
+.stats-period-tab { min-height: 32px; padding: 0 11px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-muted); background: var(--chart-track); font-size: var(--font-size-caption); font-weight: var(--font-weight-semibold); }
+.ranking-period-tab.active,
+.stats-period-tab.active { color: var(--color-on-brand); border-color: var(--color-brand); background: var(--color-brand); }
+.ranking-period-nav,
+.stats-period-nav { display: flex; align-items: center; gap: 6px; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
+.ranking-period-nav button,
+.stats-period-nav button { width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-pill); color: var(--color-brand-strong); background: var(--chart-track); font-size: 22px; line-height: 1; }
+.ranking-period-nav button:disabled,
+.stats-period-nav button:disabled { opacity: .32; }
+.family-stats-panel { grid-column: 1 / -1; margin-top: 2px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-raised); }
+.family-stats-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.family-stats-heading h2 { margin: 0; color: var(--color-text-primary); font-size: var(--font-size-section); }
+.member-stat-chart { min-width: 0; height: var(--chart-bar-height); margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; align-items: end; }
+.member-stat { min-width: 0; height: 100%; display: grid; grid-template-rows: 18px 1fr auto; justify-items: center; gap: 4px; }
+.member-stat-values { width: 100%; display: flex; justify-content: center; gap: 4px; color: var(--color-text-secondary); font-size: 11px; font-weight: var(--font-weight-bold); }
+.member-stat-bars { width: min(42px, 100%); height: 100%; display: flex; align-items: end; justify-content: center; gap: 4px; padding: 4px 0; border-radius: var(--radius-pill); background: var(--chart-track); }
+.member-bar { width: 12px; height: var(--bar-height); min-height: 0; display: block; border-radius: var(--radius-pill); background: linear-gradient(180deg, var(--member-color), var(--member-color-soft)); box-shadow: inset 1px 1px 2px var(--chart-highlight), 0 2px 6px rgba(60, 45, 30, .12); }
+.member-bar.recipe { opacity: .72; }
+.member-stat:nth-child(1) { --member-color: var(--chart-member-1); --member-color-soft: var(--chart-member-1-soft); }
+.member-stat:nth-child(2) { --member-color: var(--chart-member-2); --member-color-soft: var(--chart-member-2-soft); }
+.member-stat:nth-child(3) { --member-color: var(--chart-member-3); --member-color-soft: var(--chart-member-3-soft); }
+.member-stat:nth-child(4) { --member-color: var(--chart-member-4); --member-color-soft: var(--chart-member-4-soft); }
+.member-stat > strong { max-width: 100%; overflow: hidden; color: var(--color-text-primary); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.member-stat-legend { display: flex; justify-content: center; gap: 14px; margin-top: 8px; color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.member-stat-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend-dot { width: 8px; height: 8px; display: inline-block; border-radius: var(--radius-pill); background: var(--color-brand); }
+.legend-dot.recipe { opacity: .55; }
 
 .home-leaderboard-empty,
 .home-leaderboard p {
@@ -1938,4 +1970,8 @@ body,
   .home-shell .home-stats button { padding-left: 2px; padding-right: 2px; font-size: 11px; }
   .home-search-row .category-nav button { padding-left: 6px; padding-right: 6px; font-size: 11px; }
   .home-shell .recipe-list { gap: 10px 8px; }
+  .member-stat-chart { gap: 3px; }
+  .member-stat-bars { width: 34px; gap: 2px; }
+  .member-bar { width: 9px; }
+  .family-stats-panel { padding-inline: 10px; }
 }

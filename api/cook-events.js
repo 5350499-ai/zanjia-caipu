@@ -1,6 +1,6 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
-const { DAILY_COOK_SOURCES, canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking } = require('../lib/cook-events')
+const { DAILY_COOK_SOURCES, canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking, buildRanking, buildFamilyStats } = require('../lib/cook-events')
 
 function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
@@ -26,12 +26,30 @@ module.exports = async function handler(requestMessage, response) {
 
   const url = new URL(requestMessage.url, 'http://local')
   const recipeId = url.searchParams.get('recipeId')
+  const action = url.searchParams.get('action')
+  const period = ['all', 'year', 'month'].includes(url.searchParams.get('period')) ? url.searchParams.get('period') : 'month'
+  const now = madridDate()
+  const requestedYear = Number(url.searchParams.get('year') || now.slice(0, 4))
+  const requestedMonth = Number(url.searchParams.get('month') || now.slice(5, 7))
+  const currentYear = Number(now.slice(0, 4))
+  const currentMonth = Number(now.slice(5, 7))
+  const year = Math.min(Math.max(requestedYear, 2000), currentYear)
+  const month = Math.min(Math.max(requestedMonth, 1), year === currentYear ? currentMonth : 12)
 
   if (requestMessage.method === 'GET') {
     const recipes = await visibleRecipes(user)
     const events = await listFamilyEvents(user.familyId)
     const visibleIds = new Set(recipes.map(recipe => String(recipe.id)))
     const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
+    if (action === 'ranking') {
+      return sendJson(response, 200, { rankings: buildRanking(recipes, visibleEvents, { period, year, month }), period, year: period === 'all' ? null : year, month: period === 'month' ? month : null })
+    }
+    if (action === 'family-stats') {
+      if (user.role === 'guest') return sendJson(response, 200, { visible: false, period, year: period === 'all' ? null : year, month: period === 'month' ? month : null, members: [] })
+      const members = await request('/rest/v1/family_profiles', { query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc` })
+      const familyRecipes = await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id,created_at` })
+      return sendJson(response, 200, { visible: true, period, year: period === 'all' ? null : year, month: period === 'month' ? month : null, members: buildFamilyStats(members, familyRecipes, events, { period, year, month }) })
+    }
     if (recipeId) {
       const recipe = recipes.find(item => String(item.id) === String(recipeId))
       if (!recipe) return sendJson(response, 403, { error: '无权查看这道菜的做菜记录' })
@@ -39,9 +57,9 @@ module.exports = async function handler(requestMessage, response) {
       const today = madridDate()
       return sendJson(response, 200, { events: detailEvents, count: detailEvents.length, lastCookedOn: detailEvents[0]?.cooked_on || null, todayRecorded: detailEvents.some(event => event.cooked_on === today && DAILY_COOK_SOURCES.has(event.source)) })
     }
-    const month = madridDate().slice(0, 7)
-    const rankings = buildMonthlyRanking(recipes, visibleEvents, month)
-    return sendJson(response, 200, { rankings, month })
+    const current = madridDate().slice(0, 7)
+    const rankings = buildMonthlyRanking(recipes, visibleEvents, current)
+    return sendJson(response, 200, { rankings, month: current })
   }
 
   if (user.role === 'guest') return sendJson(response, 403, { error: '游客不能记录做菜' })
