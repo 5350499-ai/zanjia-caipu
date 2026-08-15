@@ -96,3 +96,4 @@ Explicit image removal now calls the server-side `deleteImageIfUnreferenced` hel
 ## Cook history and first-image completion (Phase 7.5)
 
 Cook counts belong to `recipe_cook_events`, not to the image itself. A recipe with no events creates its first automatic event after a successful save with a non-empty `image_id`; this also covers adding the first image later. The existing idempotent `recipe_created_with_image` source is retained for compatibility. Replacing, deleting, or re-uploading an image never changes existing cook history. Historical `initial_image_baseline` events count toward totals and rankings, but do not block the daily manual-cook action; daily status is limited to manual and first-image event sources.
+- First-image event dates are immutable. `ensureFirstCookEventForImageRecipe` checks existing events before creation and uses the Europe/Madrid date only at successful image binding; later image changes never rewrite cook history.
