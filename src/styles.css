@@ -1829,6 +1829,31 @@ body,
 .stats-period-nav strong { white-space: nowrap; }
 .ranking-period-nav button:disabled,
 .stats-period-nav button:disabled { opacity: .32; }
+.annual-trend-panel { grid-column: 1 / -1; margin-top: 2px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-raised); }
+.annual-trend-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.annual-trend-heading h2 { margin: 0; color: var(--color-text-primary); font-size: var(--font-size-section); }
+.annual-trend-nav { display: flex; align-items: center; gap: 6px; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
+.annual-trend-nav button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; padding: 0; border: 0; border-radius: var(--radius-pill); color: var(--color-brand-strong); background: var(--chart-track); font-size: 22px; line-height: 1; }
+.annual-trend-nav button:disabled { opacity: .32; }
+.annual-trend-nav strong { white-space: nowrap; }
+.annual-trend-chart-wrap { position: relative; margin-top: 10px; padding: 8px 6px 4px; border-radius: var(--radius-control); background: var(--color-surface-muted); }
+.annual-trend-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.annual-trend-axis { stroke: var(--chart-baseline); stroke-width: 1.6; opacity: .72; stroke-linecap: round; }
+.annual-trend-grid { stroke: var(--chart-baseline); stroke-width: .8; opacity: .2; stroke-dasharray: 2 6; }
+.annual-trend-axis-label, .annual-trend-month { fill: var(--color-text-muted); font-family: var(--font-family-body); font-size: 10.5px; font-weight: 400; letter-spacing: 0; }
+.annual-trend-line { fill: none; stroke: var(--trend-color); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.annual-trend-point { fill: var(--trend-color); stroke: var(--color-surface-raised); stroke-width: 1.2; pointer-events: none; }
+.annual-trend-point.is-active { r: 4.5px; }
+.annual-trend-point-hit { fill: transparent; stroke: transparent; cursor: pointer; }
+.annual-trend-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; margin-top: 2px; color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.annual-trend-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.annual-trend-legend i { width: 9px; height: 9px; border-radius: var(--radius-pill); background: var(--trend-color); }
+.annual-trend-tooltip { position: absolute; top: 6px; right: 4px; display: grid; gap: 2px; max-width: calc(100% - 8px); padding: 7px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text-primary); background: var(--color-surface-overlay); box-shadow: var(--shadow-card); font-size: var(--font-size-caption); pointer-events: none; }
+.annual-trend-tooltip span { color: var(--color-text-secondary); }
+.annual-trend-series.member-1, .annual-trend-legend .member-1 { --trend-color: var(--chart-member-4); }
+.annual-trend-series.member-2, .annual-trend-legend .member-2 { --trend-color: var(--chart-member-1); }
+.annual-trend-series.member-3, .annual-trend-legend .member-3 { --trend-color: var(--chart-member-2); }
+.annual-trend-series.member-4, .annual-trend-legend .member-4 { --trend-color: var(--chart-member-3); }
 .family-stats-panel { grid-column: 1 / -1; margin-top: 2px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-raised); }
 .family-stats-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .family-stats-heading h2 { margin: 0; color: var(--color-text-primary); font-size: var(--font-size-section); }
@@ -1981,4 +2006,6 @@ body,
   .member-stat-values { gap: 4px; font-size: 9px; }
   .member-stat-values b { font-size: 11px; }
   .family-stats-panel { padding-inline: 10px; }
+  .annual-trend-panel { padding-inline: 10px; }
+  .annual-trend-legend { gap: 8px 10px; }
 }

@@ -1,6 +1,6 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
-const { DAILY_COOK_SOURCES, canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking, buildRanking, buildFamilyStats } = require('../lib/cook-events')
+const { DAILY_COOK_SOURCES, canViewRecipe, countRecipeEvents, listFamilyEvents, madridDate, buildMonthlyRanking, buildRanking, buildFamilyStats, buildAnnualCookingTrend } = require('../lib/cook-events')
 
 function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
@@ -43,6 +43,12 @@ module.exports = async function handler(requestMessage, response) {
     const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
     if (action === 'ranking') {
       return sendJson(response, 200, { rankings: buildRanking(recipes, visibleEvents, { period, year, month }), period, year: period === 'all' ? null : year, month: period === 'month' ? month : null })
+    }
+    if (action === 'family-trend') {
+      if (user.role === 'guest') return sendJson(response, 200, { visible: false, year, members: [] })
+      const members = await request('/rest/v1/family_profiles', { query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc` })
+      const familyRecipes = await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id` })
+      return sendJson(response, 200, { visible: true, year, members: buildAnnualCookingTrend(members, familyRecipes, events, { year, currentYear, currentMonth }) })
     }
     if (action === 'family-stats') {
       if (user.role === 'guest') return sendJson(response, 200, { visible: false, period, year: period === 'all' ? null : year, month: period === 'month' ? month : null, members: [] })

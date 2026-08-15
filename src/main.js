@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudAnnualTrend, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -18,7 +18,11 @@ const IMAGE_DB_NAME = 'family-recipes-images'
 const IMAGE_STORE = 'images'
 const IMAGE_META_STORE = 'image-meta'
 const RECIPE_META_STORE = 'recipe-meta'
+const STATS_CACHE_STORE = 'stats-cache'
 const HOME_PRELOAD_LIMIT = 20
+const STATS_REVALIDATE_INTERVAL_MS = 45_000
+const YEARLY_TREND_Y_MAX = 40
+const YEARLY_TREND_Y_TICKS = [0, 10, 20, 30, 40]
 const USER_CACHE_KEY = 'family-recipes-last-user'
 const OPEN_ORDER_KEY = 'family-recipes-open-order'
 const APP_VERSION = 'v1.0.14'
@@ -119,15 +123,15 @@ function loadRecipes() {
   return currentUser ? [] : starterRecipes
 }
 
-async function hydrateRecipesFromIndexedDB() {
+async function hydrateRecipesFromIndexedDB({ renderCached = true } = {}) {
   try {
     const cached = await readRecipeCache()
     if (!Array.isArray(cached) || !cached.length) return false
     const nextRecipes = cached.map(normalizeRecipe)
     if (recipesChanged(nextRecipes)) {
       recipes = nextRecipes
-      render()
-      hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(() => null)
+      if (renderCached) render()
+      hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), renderCached).catch(() => null)
     }
     return true
   } catch (error) {
@@ -187,7 +191,12 @@ let familyStatsMonth = rankingMonth
 let familyStats = { visible: false, members: [] }
 let familyStatsLoading = false
 let familyStatsRequestGeneration = 0
+let annualTrend = { visible: false, year: rankingYear, members: [] }
+let annualTrendYear = rankingYear
+let annualTrendRequestGeneration = 0
+let annualTrendPoint = null
 let rankingRequestGeneration = 0
+const statsMemoryCache = new Map()
 let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
 let page = 'home'
@@ -221,6 +230,7 @@ let themeMode = storageGet(THEME_KEY) || 'light'
 const imageObjectUrls = new Map()
 const imageRetrying = new Set()
 const imageLoadPromises = new Map()
+const imageBlobPromises = new Map()
 
 function syncMenuScrollLock() {
   const locked = Boolean(settingsMenuOpen)
@@ -394,6 +404,51 @@ function familyStatsTemplate() {
   return `<section class="family-stats-panel" aria-label="咱家做饭记录"><div class="family-stats-heading"><h2>咱家做饭记录</h2>${periodNav}</div><div class="stats-period-tabs">${tabs}</div><div class="member-stat-chart">${bars}</div><div class="member-stat-legend"><span><i class="legend-dot cook"></i>做菜次数</span><span><i class="legend-dot recipe"></i>新增菜谱</span></div></section>`
 }
 
+function annualTrendTemplate() {
+  if (currentUser?.role === 'guest' || !annualTrend.visible) return ''
+  const rows = sortFamilyMembers(Array.isArray(annualTrend.members) ? annualTrend.members : [])
+  const now = currentMadridParts()
+  const canNext = annualTrendYear < now.year
+  const plot = { left: 34, right: 350, top: 16, bottom: 174 }
+  const plotWidth = plot.right - plot.left
+  const plotHeight = plot.bottom - plot.top
+  const xFor = month => plot.left + ((month - 1) / 11) * plotWidth
+  const yFor = value => plot.bottom - (Math.min(YEARLY_TREND_Y_MAX, Math.max(0, Number(value) || 0)) / YEARLY_TREND_Y_MAX) * plotHeight
+  const grid = YEARLY_TREND_Y_TICKS.filter(value => value > 0).map(value => {
+    const y = plot.bottom - (value / YEARLY_TREND_Y_MAX) * plotHeight
+    return `<line class="annual-trend-grid" x1="${plot.left}" x2="${plot.right}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"></line><text class="annual-trend-axis-label" x="${plot.left - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${value}次</text>`
+  }).join('')
+  const monthLabels = Array.from({ length: 12 }, (_, index) => `<text class="annual-trend-month" x="${xFor(index + 1).toFixed(1)}" y="${plot.bottom + 20}" text-anchor="middle">${index + 1}月</text>`).join('')
+  const lines = rows.map((row, rowIndex) => {
+    const values = Array.isArray(row.months) ? row.months : []
+    const segments = []
+    let currentSegment = []
+    values.forEach((value, index) => {
+      if (value === null || value === undefined) {
+        if (currentSegment.length) segments.push(currentSegment)
+        currentSegment = []
+        return
+      }
+      currentSegment.push({ x: xFor(index + 1), y: yFor(value), month: index + 1, count: Number(value) || 0 })
+    })
+    if (currentSegment.length) segments.push(currentSegment)
+    const paths = segments.map(segment => `<path class="annual-trend-line" d="${segment.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')}"></path>`).join('')
+    const points = values.map((value, index) => {
+      if (value === null || value === undefined || Number(value) === 0) return ''
+      const x = xFor(index + 1)
+      const y = yFor(value)
+      const active = annualTrendPoint?.year === annualTrendYear && annualTrendPoint.memberIndex === rowIndex && annualTrendPoint.month === index + 1
+      const attrs = `data-action="annual-trend-point" data-member-index="${rowIndex}" data-month="${index + 1}" data-count="${Number(value) || 0}" aria-label="${escapeHtml(shortMemberName(row.name))} ${annualTrendYear}年${index + 1}月 ${Number(value) || 0}次"`
+      return `<circle class="annual-trend-point${active ? ' is-active' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" aria-hidden="true"></circle><circle class="annual-trend-point-hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" ${attrs}></circle>`
+    }).join('')
+    return `<g class="annual-trend-series member-${rowIndex + 1}">${paths}${points}</g>`
+  }).join('')
+  const tooltipRow = annualTrendPoint ? rows[annualTrendPoint.memberIndex] : null
+  const tooltip = tooltipRow && annualTrendPoint.year === annualTrendYear ? `<div class="annual-trend-tooltip" role="status"><strong>${escapeHtml(shortMemberName(tooltipRow.name))}</strong><span>${annualTrendYear}年${annualTrendPoint.month}月 · ${annualTrendPoint.count}次</span></div>` : ''
+  const legend = rows.map((row, index) => `<span class="member-${index + 1}"><i></i>${escapeHtml(shortMemberName(row.name))}</span>`).join('')
+  return `<section class="annual-trend-panel" aria-label="今年做饭趋势"><div class="annual-trend-heading"><h2>今年做饭趋势</h2><div class="annual-trend-nav"><button type="button" data-action="annual-trend-prev" aria-label="上一个年份">‹</button><strong>${annualTrendYear}年</strong><button type="button" data-action="annual-trend-next" aria-label="下一个年份" ${canNext ? '' : 'disabled'}>›</button></div></div><div class="annual-trend-chart-wrap"><svg class="annual-trend-chart" viewBox="0 0 360 210" role="img" aria-label="${annualTrendYear}年四位家庭成员每月做菜次数趋势"><line class="annual-trend-axis" x1="${plot.left}" x2="${plot.left}" y1="${plot.top}" y2="${plot.bottom}"></line><line class="annual-trend-axis" x1="${plot.left}" x2="${plot.right}" y1="${plot.bottom}" y2="${plot.bottom}"></line>${grid}${lines}${monthLabels}</svg>${tooltip}</div><div class="annual-trend-legend">${legend}</div></section>`
+}
+
 function rankingTemplate() {
   const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
   const label = periodLabel(rankingPeriod, rankingYear, rankingMonth)
@@ -412,7 +467,7 @@ function recipePanelTemplate() {
   const compactScope = currentUser?.role === 'guest' ? activeScope === 'shared' : activeScope === 'mine'
   const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && compactScope && activeCategory === '全部' && !query.trim()
   const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
-  const leaderboard = isCompactHome ? `${familyStatsTemplate()}${rankingTemplate()}` : ''
+  const leaderboard = isCompactHome ? `${familyStatsTemplate()}${annualTrendTemplate()}${rankingTemplate()}` : ''
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${visibleRecipes.length ? leaderboard : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
@@ -655,16 +710,109 @@ function clearRecipeImage(recipe) {
 
 function openImageDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IMAGE_DB_NAME, 3)
+    const request = indexedDB.open(IMAGE_DB_NAME, 4)
     request.onupgradeneeded = () => {
       const database = request.result
       if (!database.objectStoreNames.contains(IMAGE_STORE)) database.createObjectStore(IMAGE_STORE)
       if (!database.objectStoreNames.contains(IMAGE_META_STORE)) database.createObjectStore(IMAGE_META_STORE)
       if (!database.objectStoreNames.contains(RECIPE_META_STORE)) database.createObjectStore(RECIPE_META_STORE)
+      if (!database.objectStoreNames.contains(STATS_CACHE_STORE)) database.createObjectStore(STATS_CACHE_STORE, { keyPath: 'key' })
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
+}
+
+function currentFamilyId() {
+  return currentUser?.familyId ? String(currentUser.familyId) : null
+}
+
+function statsCacheKey(scope, { period = 'all', year, month } = {}) {
+  const familyId = currentFamilyId()
+  if (!familyId) return null
+  if (scope === 'annual-trend') return `annual-trend:${familyId}:${Number(year)}`
+  const prefix = `${scope}:${familyId}`
+  if (period === 'year') return `${prefix}:year:${Number(year)}`
+  if (period === 'month') return `${prefix}:month:${Number(year)}-${String(month).padStart(2, '0')}`
+  return `${prefix}:all`
+}
+
+async function readStatsCache(scope, params = {}) {
+  const key = statsCacheKey(scope, params)
+  if (!key) return null
+  const memory = statsMemoryCache.get(key)
+  if (memory && memory.familyId === currentFamilyId()) {
+    console.info(JSON.stringify({ stage: 'STATS_CACHE_HIT', scope, key, source: 'memory' }))
+    return memory
+  }
+  try {
+    const database = await openImageDatabase()
+    const entry = await new Promise((resolve, reject) => {
+      const request = database.transaction(STATS_CACHE_STORE, 'readonly').objectStore(STATS_CACHE_STORE).get(key)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+    database.close()
+    if (entry?.familyId === currentFamilyId()) {
+      statsMemoryCache.set(key, entry)
+      console.info(JSON.stringify({ stage: 'STATS_CACHE_HIT', scope, key, source: 'indexeddb' }))
+      return entry
+    }
+  } catch (error) {
+    console.info(JSON.stringify({ stage: 'STATS_CACHE_MISS', scope, key, reason: 'indexeddb_unavailable' }))
+  }
+  console.info(JSON.stringify({ stage: 'STATS_CACHE_MISS', scope, key }))
+  return null
+}
+
+async function writeStatsCache(scope, params, data) {
+  const key = statsCacheKey(scope, params)
+  const familyId = currentFamilyId()
+  if (!key || !familyId || !data) return
+  const entry = { key, familyId, scope, period: params.period || (scope === 'annual-trend' ? 'year' : 'all'), year: params.year || null, month: params.month || null, data, updatedAt: Date.now(), schemaVersion: 1 }
+  statsMemoryCache.set(key, entry)
+  try {
+    const database = await openImageDatabase()
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STATS_CACHE_STORE, 'readwrite')
+      transaction.objectStore(STATS_CACHE_STORE).put(entry)
+      transaction.oncomplete = resolve
+      transaction.onerror = () => reject(transaction.error)
+    })
+    database.close()
+  } catch {
+    // Cache writes are best-effort and must never block server truth.
+  }
+}
+
+async function invalidateStatsCacheForMutation({ familyStats = false, ranking = false, annualTrend = false } = {}) {
+  const familyId = currentFamilyId()
+  if (!familyId) return
+  const scopes = new Set([...(familyStats ? ['family-stats'] : []), ...(ranking ? ['ranking'] : []), ...(annualTrend ? ['annual-trend'] : [])])
+  if (!scopes.size) return
+  for (const [key, entry] of statsMemoryCache) {
+    if (entry.familyId === familyId && scopes.has(entry.scope)) statsMemoryCache.delete(key)
+  }
+  try {
+    const database = await openImageDatabase()
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STATS_CACHE_STORE, 'readwrite')
+      const store = transaction.objectStore(STATS_CACHE_STORE)
+      const request = store.openCursor()
+      request.onsuccess = () => {
+        const cursor = request.result
+        if (!cursor) return
+        if (cursor.value?.familyId === familyId && scopes.has(cursor.value.scope)) cursor.delete()
+        cursor.continue()
+      }
+      transaction.oncomplete = resolve
+      transaction.onerror = () => reject(transaction.error)
+    })
+    database.close()
+    console.info(JSON.stringify({ stage: 'STATS_CACHE_INVALIDATE', familyId, scopes: [...scopes] }))
+  } catch {
+    // Cache invalidation is best-effort; the next freshness check revalidates.
+  }
 }
 
 async function writeRecipeCache(serializableRecipes) {
@@ -748,6 +896,7 @@ async function readImage(imageId, version = '') {
 async function removeStoredImage(imageId, version = '') {
   const cacheKey = recipeImageCacheKey(imageId, version)
   if (!cacheKey) return
+  imageBlobPromises.delete(cacheKey)
   const objectUrl = imageObjectUrls.get(cacheKey)
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl)
@@ -782,10 +931,11 @@ async function removeRemoteImageIfSafe(imageId, recipeId, version = '', requestI
 async function clearIndexedDBCache() {
   const database = await openImageDatabase()
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction([IMAGE_STORE, IMAGE_META_STORE, RECIPE_META_STORE], 'readwrite')
+    const transaction = database.transaction([IMAGE_STORE, IMAGE_META_STORE, RECIPE_META_STORE, STATS_CACHE_STORE], 'readwrite')
     transaction.objectStore(IMAGE_STORE).clear()
     transaction.objectStore(IMAGE_META_STORE).clear()
     transaction.objectStore(RECIPE_META_STORE).delete(userStorageKey())
+    transaction.objectStore(STATS_CACHE_STORE).clear()
     transaction.oncomplete = () => { database.close(); resolve() }
     transaction.onerror = () => { database.close(); reject(transaction.error) }
   })
@@ -797,6 +947,8 @@ async function clearLocalCacheAndReload() {
   for (const objectUrl of imageObjectUrls.values()) URL.revokeObjectURL(objectUrl)
   imageObjectUrls.clear()
   imageLoadPromises.clear()
+  imageBlobPromises.clear()
+  statsMemoryCache.clear()
   await Promise.allSettled([clearIndexedDBCache(), clearCloudImageResponseCache(), clearCloudStaticResponseCache()])
   recipes = []
   render()
@@ -848,12 +1000,12 @@ async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true)
   await Promise.all(targetRecipes.map(async recipe => {
     try {
       if (recipe.imageId) {
-        const blob = await readImage(recipe.imageId, recipe.imageVersion)
+        const blob = await readCachedImageOnce(recipe.imageId, recipe.imageVersion)
         if (blob) setRecipeImageFromBlob(recipe, blob)
       }
       await Promise.all((recipe.cookRecords || []).map(async record => {
         if (!record.imageId) return
-        const blob = await readImage(record.imageId, record.imageVersion)
+        const blob = await readCachedImageOnce(record.imageId, record.imageVersion)
         if (blob) setRecordImageFromBlob(record, blob)
       }))
     } catch (error) {
@@ -861,6 +1013,20 @@ async function hydrateRecipeImages(targetRecipes = recipes, shouldRender = true)
     }
   }))
   if (shouldRender) render()
+}
+
+function readCachedImageOnce(imageId, version = '') {
+  const cacheKey = recipeImageCacheKey(imageId, version)
+  if (!cacheKey) return Promise.resolve(null)
+  let load = imageBlobPromises.get(cacheKey)
+  if (!load) {
+    load = readImage(imageId, version).then(blob => {
+      console.info(JSON.stringify({ stage: blob ? 'IMAGE_IDB_HIT' : 'IMAGE_IDB_MISS', imageId }))
+      return blob
+    }).catch(() => null)
+    imageBlobPromises.set(cacheKey, load)
+  }
+  return load
 }
 
 function setRecordImageFromBlob(record, blob) {
@@ -889,10 +1055,14 @@ async function cacheRecipeImage(recipe) {
     let load = imageLoadPromises.get(cacheKey)
     if (!load) {
       load = (async () => {
-        const cached = await readImage(recipe.imageId, recipe.imageVersion).catch(() => null)
+        const cached = await readCachedImageOnce(recipe.imageId, recipe.imageVersion)
         if (cached) return cached
+        console.info(JSON.stringify({ stage: 'IMAGE_REMOTE_FETCH', imageId: recipe.imageId }))
         const blob = await downloadCloudImage(recipe.imageId, recipe.imageVersion)
-        if (blob) await storeImage(recipe.imageId, blob, recipe.imageVersion)
+        if (blob) {
+          await storeImage(recipe.imageId, blob, recipe.imageVersion)
+          imageBlobPromises.set(cacheKey, Promise.resolve(blob))
+        } else imageBlobPromises.delete(cacheKey)
         return blob
       })().finally(() => imageLoadPromises.delete(cacheKey))
       imageLoadPromises.set(cacheKey, load)
@@ -907,10 +1077,14 @@ async function cacheRecipeImage(recipe) {
     let load = imageLoadPromises.get(cacheKey)
     if (!load) {
       load = (async () => {
-        const cached = await readImage(record.imageId, record.imageVersion).catch(() => null)
+        const cached = await readCachedImageOnce(record.imageId, record.imageVersion)
         if (cached) return cached
+        console.info(JSON.stringify({ stage: 'IMAGE_REMOTE_FETCH', imageId: record.imageId }))
         const blob = await downloadCloudImage(record.imageId, record.imageVersion)
-        if (blob) await storeImage(record.imageId, blob, record.imageVersion)
+        if (blob) {
+          await storeImage(record.imageId, blob, record.imageVersion)
+          imageBlobPromises.set(cacheKey, Promise.resolve(blob))
+        } else imageBlobPromises.delete(cacheKey)
         return blob
       })().finally(() => imageLoadPromises.delete(cacheKey))
       imageLoadPromises.set(cacheKey, load)
@@ -945,9 +1119,6 @@ async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
     const cloudRecipes = await loadCloudLibrary()
-    const nextMonthlyRanking = Array.isArray(window.__familyRecipeRanking) ? window.__familyRecipeRanking : (Array.isArray(window.__familyRecipeMonthlyRanking) ? window.__familyRecipeMonthlyRanking : [])
-    const nextFamilyStats = window.__familyCookingStats || { visible: false, members: [] }
-    if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
     const currentRecipeImages = new Map(recipes.map(recipe => [String(recipe.id), { imageId: recipe.imageId, imageVersion: recipe.imageVersion, image: recipe.image }]))
@@ -955,11 +1126,8 @@ async function syncCloudLibrary({ force = false } = {}) {
       const currentImage = currentRecipeImages.get(String(recipe.id))
       if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
     })
-    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking) || JSON.stringify(familyStats) !== JSON.stringify(nextFamilyStats)
-    const shouldRender = force || recipesChanged(syncedRecipes) || rankingChanged
+    const shouldRender = force || recipesChanged(syncedRecipes)
     recipes = syncedRecipes
-    monthlyRanking = nextMonthlyRanking
-    familyStats = nextFamilyStats
     const serializable = serializeRecipes()
     storageSet(userStorageKey(), JSON.stringify(serializable))
     writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
@@ -967,6 +1135,7 @@ async function syncCloudLibrary({ force = false } = {}) {
     if (shouldRender) render()
     hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
     preloadHomeImages().catch(error => console.warn('首页图片预加载失败。', error))
+    await Promise.allSettled([refreshFamilyStatsOnly({ force }), refreshRankingOnly({ force }), refreshAnnualTrendOnly({ force })])
   } catch (error) {
     console.warn('云端菜谱读取失败，继续使用本机数据。', error)
     if (!navigator.onLine) window.alert('当前离线，已显示本地缓存。联网后会自动同步。')
@@ -1217,6 +1386,7 @@ async function saveRecipe() {
     await removeRemoteImageIfSafe(oldImageId, id, oldImageVersion, requestId)
     if (current?.image?.startsWith('blob:') && current.image !== draftRef.image) URL.revokeObjectURL(current.image)
   }
+  await invalidateStatsCacheForMutation({ familyStats: true, ranking: Boolean(imageId && (!oldImageId || !isEditing)), annualTrend: Boolean(imageId && (!oldImageId || !isEditing)) })
   if (!isEditing) touchRecipeOpen(id)
   activeCategory = '全部'
   query = ''
@@ -1256,6 +1426,7 @@ async function deleteCurrentRecipe() {
   deleteRecipePrompt = false
   page = 'home'
   history.replaceState({ appPage: 'home' }, '')
+  await invalidateStatsCacheForMutation({ familyStats: true, ranking: true, annualTrend: true })
   await syncCloudLibrary({ force: true })
   render()
 }
@@ -1559,7 +1730,10 @@ async function saveCookRecord() {
     await Promise.allSettled([removeStoredImage(oldImageId, oldImageVersion)])
   }
   cookEditor = null
-  if (isNewRecord) await syncCloudLibrary({ force: true })
+  if (isNewRecord) {
+    await invalidateStatsCacheForMutation({ familyStats: true, ranking: true, annualTrend: true })
+    await syncCloudLibrary({ force: true })
+  }
   render()
 }
 
@@ -1599,6 +1773,7 @@ async function deleteCookRecord(recordId) {
       return
     }
   }
+  await invalidateStatsCacheForMutation({ familyStats: true, ranking: true, annualTrend: true })
   if (record.imageId) await Promise.allSettled([removeStoredImage(record.imageId, record.imageVersion)])
   if (record.image?.startsWith('blob:')) URL.revokeObjectURL(record.image)
   if (cookEditor?.id && sameId(cookEditor.id, recordId)) cookEditor = null
@@ -1870,8 +2045,15 @@ root.addEventListener('error', event => {
 
 root.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
-  if (!target) return
+  if (!target) {
+    if (annualTrendPoint) { annualTrendPoint = null; render() }
+    return
+  }
   const action = target.dataset.action
+  if (annualTrendPoint && action !== 'annual-trend-point') {
+    annualTrendPoint = null
+    if (!action) { render(); return }
+  }
   if (target.classList.contains('settings-layer') && event.target instanceof Element && event.target.closest('.settings-popover')) return
   if (action && target.closest('.settings-popover') && action !== 'close-settings') {
     settingsMenuOpen = false
@@ -1885,6 +2067,13 @@ root.addEventListener('click', async event => {
   if (action === 'family-stats-next') { await stepFamilyStatsPeriod(1); return }
   if (action === 'ranking-prev') { await stepRankingPeriod(-1); return }
   if (action === 'ranking-next') { await stepRankingPeriod(1); return }
+  if (action === 'annual-trend-point') {
+    annualTrendPoint = { year: annualTrendYear, memberIndex: Number(target.dataset.memberIndex), month: Number(target.dataset.month), count: Number(target.dataset.count) || 0 }
+    render()
+    return
+  }
+  if (action === 'annual-trend-prev') { await stepAnnualTrendYear(-1); return }
+  if (action === 'annual-trend-next') { await stepAnnualTrendYear(1); return }
   if (target.dataset.scope) {
     const nextScope = target.dataset.scope
     if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
@@ -2303,6 +2492,7 @@ async function quickCookRecipe() {
     const count = Number(result.count || cookStatus.count || recipe.cookCount || 0)
     cookStatus = { recipeId: recipe.id, count, todayRecorded: true, loading: false, busy: false }
     recipes = recipes.map(item => sameId(item.id, recipe.id) ? { ...item, cookCount: count, lastCookedAt: new Date().toLocaleDateString('sv-SE') } : item)
+    await invalidateStatsCacheForMutation({ familyStats: true, ranking: true, annualTrend: true })
     await syncCloudLibrary({ force: true })
     render()
   } catch (error) {
@@ -2312,42 +2502,102 @@ async function quickCookRecipe() {
   }
 }
 
-async function refreshFamilyStatsOnly() {
+async function refreshFamilyStatsOnly({ force = false } = {}) {
   if (!cloudReady || currentUser?.role === 'guest') return
   const requestGeneration = ++familyStatsRequestGeneration
   const requestedPeriod = familyStatsPeriod
   const requestedYear = familyStatsYear
   const requestedMonth = familyStatsMonth
-  familyStatsLoading = true
-  render()
+  const params = { period: requestedPeriod, year: requestedYear, month: requestedMonth }
+  let freshDataChanged = false
+  const cached = await readStatsCache('family-stats', params)
+  const cacheIsFresh = cached && Date.now() - Number(cached.updatedAt || 0) < STATS_REVALIDATE_INTERVAL_MS
+  if (cached?.data && requestGeneration === familyStatsRequestGeneration && familyStatsPeriod === requestedPeriod && familyStatsYear === requestedYear && familyStatsMonth === requestedMonth) {
+    familyStats = cached.data
+    familyStatsLoading = false
+    render()
+  } else if (!cached) {
+    familyStatsLoading = true
+    render()
+  }
+  if (cacheIsFresh && !force) return
+  console.info(JSON.stringify({ stage: 'STATS_REVALIDATE_START', scope: 'family-stats', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
   try {
     const statsData = await loadCloudFamilyStats({ period: requestedPeriod, year: requestedYear, month: requestedMonth })
     if (requestGeneration !== familyStatsRequestGeneration || familyStatsPeriod !== requestedPeriod || familyStatsYear !== requestedYear || familyStatsMonth !== requestedMonth) return
+    const unchanged = JSON.stringify(familyStats) === JSON.stringify(statsData)
     familyStats = statsData
+    freshDataChanged = !unchanged
+    await writeStatsCache('family-stats', params, statsData)
+    console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'family-stats', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
   } catch (error) {
     console.warn('统计刷新失败', error)
   } finally {
     if (requestGeneration !== familyStatsRequestGeneration) return
     familyStatsLoading = false
-    render()
+    if (freshDataChanged || !cached) render()
   }
 }
 
-async function refreshRankingOnly() {
+async function refreshAnnualTrendOnly({ force = false } = {}) {
+  if (!cloudReady || currentUser?.role === 'guest') return
+  const requestGeneration = ++annualTrendRequestGeneration
+  const requestedYear = annualTrendYear
+  annualTrendPoint = null
+  const params = { period: 'year', year: requestedYear }
+  let freshDataChanged = false
+  const cached = await readStatsCache('annual-trend', params)
+  const cacheIsFresh = cached && Date.now() - Number(cached.updatedAt || 0) < STATS_REVALIDATE_INTERVAL_MS
+  if (cached?.data && requestGeneration === annualTrendRequestGeneration && annualTrendYear === requestedYear) {
+    annualTrend = cached.data
+    render()
+  }
+  if (cacheIsFresh && !force) return
+  console.info(JSON.stringify({ stage: 'STATS_REVALIDATE_START', scope: 'annual-trend', year: requestedYear }))
+  try {
+    const trendData = await loadCloudAnnualTrend(requestedYear)
+    if (requestGeneration !== annualTrendRequestGeneration || annualTrendYear !== requestedYear) return
+    const unchanged = JSON.stringify(annualTrend) === JSON.stringify(trendData)
+    annualTrend = trendData
+    freshDataChanged = !unchanged
+    await writeStatsCache('annual-trend', params, trendData)
+    console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'annual-trend', year: requestedYear }))
+  } catch (error) {
+    console.warn('年度做饭趋势刷新失败', error)
+  }
+  if (requestGeneration !== annualTrendRequestGeneration) return
+  if (freshDataChanged || !cached) render()
+}
+
+async function refreshRankingOnly({ force = false } = {}) {
   if (!cloudReady) return
   const requestGeneration = ++rankingRequestGeneration
   const requestedPeriod = rankingPeriod
   const requestedYear = rankingYear
   const requestedMonth = rankingMonth
+  const params = { period: requestedPeriod, year: requestedYear, month: requestedMonth }
+  let freshDataChanged = false
+  const cached = await readStatsCache('ranking', params)
+  const cacheIsFresh = cached && Date.now() - Number(cached.updatedAt || 0) < STATS_REVALIDATE_INTERVAL_MS
+  if (cached?.data && requestGeneration === rankingRequestGeneration && rankingPeriod === requestedPeriod && rankingYear === requestedYear && rankingMonth === requestedMonth) {
+    monthlyRanking = Array.isArray(cached.data.rankings) ? cached.data.rankings : []
+    render()
+  }
+  if (cacheIsFresh && !force) return
+  console.info(JSON.stringify({ stage: 'STATS_REVALIDATE_START', scope: 'ranking', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
   try {
     const rankingData = await loadCloudRanking({ period: requestedPeriod, year: requestedYear, month: requestedMonth })
     if (requestGeneration !== rankingRequestGeneration || rankingPeriod !== requestedPeriod || rankingYear !== requestedYear || rankingMonth !== requestedMonth) return
+    const unchanged = JSON.stringify(monthlyRanking) === JSON.stringify(Array.isArray(rankingData.rankings) ? rankingData.rankings : [])
     monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
+    freshDataChanged = !unchanged
+    await writeStatsCache('ranking', params, rankingData)
+    console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'ranking', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
   } catch (error) {
     console.warn('排行榜刷新失败', error)
   }
   if (requestGeneration !== rankingRequestGeneration) return
-  render()
+  if (freshDataChanged || !cached) render()
 }
 
 function currentMadridParts() {
@@ -2384,6 +2634,14 @@ async function stepFamilyStatsPeriod(delta) {
     familyStatsYear = now.year; familyStatsMonth = now.month
   }
   await refreshFamilyStatsOnly()
+}
+
+async function stepAnnualTrendYear(delta) {
+  const now = currentMadridParts()
+  const nextYear = Math.min(now.year, Math.max(2000, annualTrendYear + delta))
+  if (nextYear === annualTrendYear) return
+  annualTrendYear = nextYear
+  await refreshAnnualTrendOnly()
 }
 
 async function setRankingPeriod(period) {
@@ -2448,10 +2706,10 @@ async function startApplication() {
     settingsMenuOpen = false
     clearRecipeComments()
     recipes = loadRecipes()
+    await hydrateRecipesFromIndexedDB({ renderCached: false }).catch(() => null)
+    await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), false).catch(() => null)
     render()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
-    hydrateRecipesFromIndexedDB().catch(() => null)
-    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
     if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
     bootstrapCloudSync().catch(error => console.warn('后台同步启动失败。', error))
   } catch (error) {
@@ -2520,8 +2778,11 @@ function goHome(fromHistory = false) {
   familyStatsPeriod = 'all'
   const now = currentMadridParts()
   rankingYear = now.year; rankingMonth = now.month; familyStatsYear = now.year; familyStatsMonth = now.month
+  annualTrendYear = now.year
+  annualTrendPoint = null
   render()
   refreshFamilyStatsOnly().catch(() => null)
+  refreshAnnualTrendOnly().catch(() => null)
   refreshRankingOnly().catch(() => null)
 }
 

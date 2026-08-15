@@ -75,6 +75,8 @@ Supabase REST + Storage
 
 ## Cooking event layer (Phase 7.2)
 
+The home annual cooking trend uses the authenticated `family-trend` action in `/api/cook-events`, with server-side aggregation and the same member attribution rules as family stats. Its SVG renderer leaves future current-year months as null and protects year navigation with a request generation guard.
+
 `api/cook-events.js` exposes authenticated event reads and writes. `lib/cook-events.js` centralizes Europe/Madrid calendar handling, recipe visibility checks, event summaries, baseline creation, and monthly ranking tie-breaks. The `recipe_cook_events` table is append-oriented and auditable; `recipes.cook_count`/`last_cooked_at` are maintained only as compatibility projections. `api/recipes.js` returns event-derived counts and the current monthly top five, while `src/cloud.js` and `src/main.js` connect the existing “记录这次” UI without introducing a second button or changing image/auth/storage behavior.
 
 ## 材料统一兼容（2026-08-01）
@@ -97,3 +99,7 @@ Explicit image removal now calls the server-side `deleteImageIfUnreferenced` hel
 
 Cook counts belong to `recipe_cook_events`, not to the image itself. A recipe with no events creates its first automatic event after a successful save with a non-empty `image_id`; this also covers adding the first image later. The existing idempotent `recipe_created_with_image` source is retained for compatibility. Replacing, deleting, or re-uploading an image never changes existing cook history. Historical `initial_image_baseline` events count toward totals and rankings, but do not block the daily manual-cook action; daily status is limited to manual and first-image event sources.
 - First-image event dates are immutable. `ensureFirstCookEventForImageRecipe` checks existing events before creation and uses the Europe/Madrid date only at successful image binding; later image changes never rewrite cook history.
+
+## 统计缓存与年度趋势（2026-08-15）
+
+继续使用 `family-recipes-images` IndexedDB；数据库版本由 3 升级到 4，仅新增 `stats-cache` store，不改变既有图片和菜谱快照 store。统计缓存按 `familyId` 隔离，覆盖家庭统计、排行榜和年度趋势，使用短 freshness 窗口的 stale-while-revalidate。缓存只改善首屏显示，不替代服务器事实；请求代际仍负责丢弃过期响应。年度趋势复用既有做菜事件口径和成员颜色。

@@ -171,3 +171,13 @@
 - Treat the first successful image added to a recipe with zero cook events as the idempotent first cook event, including recipes created without an image.
 - Keep historical image baselines out of the daily manual-cook lock while retaining them for totals and rankings.
 - 2026-08-15: Audited and repaired 64 `initial_image_baseline` dates from auditable Storage object creation dates; documented immutable first-image event dates and preserved all event identity/source/user fields.
+
+## 2026-08-15 - Cache convergence and annual trend integration
+- Kept the existing `family-recipes-images` IndexedDB, Cache Storage image responses, and Service Worker shell; added only the version-4 `stats-cache` store for family-isolated statistics.
+- Added stale-while-revalidate reads for family stats, rankings, and annual cooking trend with request-generation guards and mutation invalidation.
+- Hydrated cached image Blobs through a single per-key promise path and retained the existing `imageId@imageVersion` identity.
+- Integrated the annual cooking trend card with fixed 0/10/20/30/40 axes, lightweight SVG lines, and the established four-member colors.
+
+## Phase 7.6
+
+- Added the authenticated annual cooking trend card between family stats and the home ranking, with server-side monthly event aggregation, current-year future-month nulls, member color reuse, point tooltips, and guarded year navigation.
