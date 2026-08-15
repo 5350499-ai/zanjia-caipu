@@ -56,6 +56,11 @@
 
 ## Future cooking-event rules (design only)
 
+## Annual cooking trends (Phase 7.6)
+
+- Annual cooking trends aggregate cook events by `cooked_on` month and member. Baseline events use `recipes.author_user_id`; other events use `recipe_cook_events.user_id`.
+- Future months in the current Europe/Madrid year remain null rather than being treated as zero.
+
 ## Cooking events Phase 7.2 (2026-08-14)
 
 - `recipe_cook_events` is the auditable source for cooking counts and future month/year rankings. Existing `recipes.cook_count` and `last_cooked_at` remain compatibility projections only.

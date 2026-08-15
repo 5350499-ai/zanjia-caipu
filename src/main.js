@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudAnnualTrend, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -187,6 +187,10 @@ let familyStatsMonth = rankingMonth
 let familyStats = { visible: false, members: [] }
 let familyStatsLoading = false
 let familyStatsRequestGeneration = 0
+let annualTrend = { visible: false, year: rankingYear, members: [] }
+let annualTrendYear = rankingYear
+let annualTrendRequestGeneration = 0
+let annualTrendPoint = null
 let rankingRequestGeneration = 0
 let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
@@ -394,6 +398,52 @@ function familyStatsTemplate() {
   return `<section class="family-stats-panel" aria-label="咱家做饭记录"><div class="family-stats-heading"><h2>咱家做饭记录</h2>${periodNav}</div><div class="stats-period-tabs">${tabs}</div><div class="member-stat-chart">${bars}</div><div class="member-stat-legend"><span><i class="legend-dot cook"></i>做菜次数</span><span><i class="legend-dot recipe"></i>新增菜谱</span></div></section>`
 }
 
+function annualTrendTemplate() {
+  if (currentUser?.role === 'guest' || !annualTrend.visible) return ''
+  const rows = sortFamilyMembers(Array.isArray(annualTrend.members) ? annualTrend.members : [])
+  const now = currentMadridParts()
+  const canNext = annualTrendYear < now.year
+  const plot = { left: 28, right: 348, top: 16, bottom: 174 }
+  const plotWidth = plot.right - plot.left
+  const plotHeight = plot.bottom - plot.top
+  const maxValue = Math.max(1, ...rows.flatMap(row => (row.months || []).filter(value => value !== null).map(value => Number(value) || 0)))
+  const xFor = month => plot.left + ((month - 1) / 11) * plotWidth
+  const yFor = value => plot.bottom - ((Number(value) || 0) / maxValue) * plotHeight
+  const grid = [0, 1, 2, 3].map(step => {
+    const y = plot.bottom - (step / 3) * plotHeight
+    const value = Math.round(maxValue * (step / 3))
+    return `<line class="annual-trend-grid" x1="${plot.left}" x2="${plot.right}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"></line><text class="annual-trend-axis-label" x="${plot.left - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${value}</text>`
+  }).join('')
+  const monthLabels = Array.from({ length: 12 }, (_, index) => `<text class="annual-trend-month" x="${xFor(index + 1).toFixed(1)}" y="${plot.bottom + 20}" text-anchor="middle">${index + 1}月</text>`).join('')
+  const memberColor = index => [4, 1, 2, 3][index] || 4
+  const lines = rows.map((row, rowIndex) => {
+    const values = Array.isArray(row.months) ? row.months : []
+    const segments = []
+    let currentSegment = []
+    values.forEach((value, index) => {
+      if (value === null || value === undefined) {
+        if (currentSegment.length) segments.push(currentSegment)
+        currentSegment = []
+        return
+      }
+      currentSegment.push({ x: xFor(index + 1), y: yFor(value), month: index + 1, count: Number(value) || 0 })
+    })
+    if (currentSegment.length) segments.push(currentSegment)
+    const paths = segments.map(segment => `<path class="annual-trend-line" d="${segment.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')}"></path>`).join('')
+    const points = values.map((value, index) => {
+      if (value === null || value === undefined) return ''
+      const x = xFor(index + 1)
+      const y = yFor(value)
+      return `<circle class="annual-trend-point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" data-action="annual-trend-point" data-member-index="${rowIndex}" data-month="${index + 1}" data-count="${Number(value) || 0}" aria-label="${escapeHtml(shortMemberName(row.name))} ${annualTrendYear}年${index + 1}月 ${Number(value) || 0}次"></circle>`
+    }).join('')
+    return `<g class="annual-trend-series member-${memberColor(rowIndex)}" style="--trend-color:var(--chart-member-${memberColor(rowIndex)})">${paths}${points}</g>`
+  }).join('')
+  const tooltipRow = annualTrendPoint ? rows[annualTrendPoint.memberIndex] : null
+  const tooltip = tooltipRow && annualTrendPoint.year === annualTrendYear ? `<div class="annual-trend-tooltip" role="status"><strong>${escapeHtml(shortMemberName(tooltipRow.name))}</strong><span>${annualTrendYear}年${annualTrendPoint.month}月 · ${annualTrendPoint.count}次</span></div>` : ''
+  const legend = rows.map((row, index) => `<span class="member-${memberColor(index)}"><i></i>${escapeHtml(shortMemberName(row.name))}</span>`).join('')
+  return `<section class="annual-trend-panel" aria-label="今年做饭趋势"><div class="annual-trend-heading"><h2>今年做饭趋势</h2><div class="annual-trend-nav"><button type="button" data-action="annual-trend-prev" aria-label="上一个年份">‹</button><strong>${annualTrendYear}年</strong><button type="button" data-action="annual-trend-next" aria-label="下一个年份" ${canNext ? '' : 'disabled'}>›</button></div></div><div class="annual-trend-chart-wrap"><svg class="annual-trend-chart" viewBox="0 0 360 210" role="img" aria-label="${annualTrendYear}年四位家庭成员每月做菜次数趋势">${grid}${lines}${monthLabels}</svg>${tooltip}</div><div class="annual-trend-legend">${legend}</div></section>`
+}
+
 function rankingTemplate() {
   const rankingMax = Math.max(1, ...monthlyRanking.map(item => Number(item.count) || 0))
   const label = periodLabel(rankingPeriod, rankingYear, rankingMonth)
@@ -412,7 +462,7 @@ function recipePanelTemplate() {
   const compactScope = currentUser?.role === 'guest' ? activeScope === 'shared' : activeScope === 'mine'
   const isCompactHome = page === 'home' && homeView === 'home' && !viewingMember && compactScope && activeCategory === '全部' && !query.trim()
   const visibleRecipes = isCompactHome ? filtered.slice(0, 6) : filtered
-  const leaderboard = isCompactHome ? `${familyStatsTemplate()}${rankingTemplate()}` : ''
+  const leaderboard = isCompactHome ? `${familyStatsTemplate()}${annualTrendTemplate()}${rankingTemplate()}` : ''
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${visibleRecipes.length ? leaderboard : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
@@ -947,6 +997,7 @@ async function syncCloudLibrary({ force = false } = {}) {
     const cloudRecipes = await loadCloudLibrary()
     const nextMonthlyRanking = Array.isArray(window.__familyRecipeRanking) ? window.__familyRecipeRanking : (Array.isArray(window.__familyRecipeMonthlyRanking) ? window.__familyRecipeMonthlyRanking : [])
     const nextFamilyStats = window.__familyCookingStats || { visible: false, members: [] }
+    const nextAnnualTrend = window.__familyAnnualTrend || { visible: false, year: annualTrendYear, members: [] }
     if (window.__familyRecipeStats?.memberCount) familyMemberCount = window.__familyRecipeStats.memberCount
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
@@ -955,11 +1006,12 @@ async function syncCloudLibrary({ force = false } = {}) {
       const currentImage = currentRecipeImages.get(String(recipe.id))
       if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
     })
-    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking) || JSON.stringify(familyStats) !== JSON.stringify(nextFamilyStats)
+    const rankingChanged = JSON.stringify(monthlyRanking) !== JSON.stringify(nextMonthlyRanking) || JSON.stringify(familyStats) !== JSON.stringify(nextFamilyStats) || JSON.stringify(annualTrend) !== JSON.stringify(nextAnnualTrend)
     const shouldRender = force || recipesChanged(syncedRecipes) || rankingChanged
     recipes = syncedRecipes
     monthlyRanking = nextMonthlyRanking
     familyStats = nextFamilyStats
+    annualTrend = nextAnnualTrend
     const serializable = serializeRecipes()
     storageSet(userStorageKey(), JSON.stringify(serializable))
     writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
@@ -1870,7 +1922,10 @@ root.addEventListener('error', event => {
 
 root.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
-  if (!target) return
+  if (!target) {
+    if (annualTrendPoint) { annualTrendPoint = null; render() }
+    return
+  }
   const action = target.dataset.action
   if (target.classList.contains('settings-layer') && event.target instanceof Element && event.target.closest('.settings-popover')) return
   if (action && target.closest('.settings-popover') && action !== 'close-settings') {
@@ -1885,6 +1940,13 @@ root.addEventListener('click', async event => {
   if (action === 'family-stats-next') { await stepFamilyStatsPeriod(1); return }
   if (action === 'ranking-prev') { await stepRankingPeriod(-1); return }
   if (action === 'ranking-next') { await stepRankingPeriod(1); return }
+  if (action === 'annual-trend-point') {
+    annualTrendPoint = { year: annualTrendYear, memberIndex: Number(target.dataset.memberIndex), month: Number(target.dataset.month), count: Number(target.dataset.count) || 0 }
+    render()
+    return
+  }
+  if (action === 'annual-trend-prev') { await stepAnnualTrendYear(-1); return }
+  if (action === 'annual-trend-next') { await stepAnnualTrendYear(1); return }
   if (target.dataset.scope) {
     const nextScope = target.dataset.scope
     if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
@@ -2333,6 +2395,22 @@ async function refreshFamilyStatsOnly() {
   }
 }
 
+async function refreshAnnualTrendOnly() {
+  if (!cloudReady || currentUser?.role === 'guest') return
+  const requestGeneration = ++annualTrendRequestGeneration
+  const requestedYear = annualTrendYear
+  annualTrendPoint = null
+  try {
+    const trendData = await loadCloudAnnualTrend(requestedYear)
+    if (requestGeneration !== annualTrendRequestGeneration || annualTrendYear !== requestedYear) return
+    annualTrend = trendData
+  } catch (error) {
+    console.warn('年度做饭趋势刷新失败', error)
+  }
+  if (requestGeneration !== annualTrendRequestGeneration) return
+  render()
+}
+
 async function refreshRankingOnly() {
   if (!cloudReady) return
   const requestGeneration = ++rankingRequestGeneration
@@ -2384,6 +2462,14 @@ async function stepFamilyStatsPeriod(delta) {
     familyStatsYear = now.year; familyStatsMonth = now.month
   }
   await refreshFamilyStatsOnly()
+}
+
+async function stepAnnualTrendYear(delta) {
+  const now = currentMadridParts()
+  const nextYear = Math.min(now.year, Math.max(2000, annualTrendYear + delta))
+  if (nextYear === annualTrendYear) return
+  annualTrendYear = nextYear
+  await refreshAnnualTrendOnly()
 }
 
 async function setRankingPeriod(period) {
@@ -2520,8 +2606,11 @@ function goHome(fromHistory = false) {
   familyStatsPeriod = 'all'
   const now = currentMadridParts()
   rankingYear = now.year; rankingMonth = now.month; familyStatsYear = now.year; familyStatsMonth = now.month
+  annualTrendYear = now.year
+  annualTrendPoint = null
   render()
   refreshFamilyStatsOnly().catch(() => null)
+  refreshAnnualTrendOnly().catch(() => null)
   refreshRankingOnly().catch(() => null)
 }
 

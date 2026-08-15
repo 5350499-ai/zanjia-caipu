@@ -8,14 +8,18 @@ export async function loadCloudLibrary() {
   const data = await response.json()
   window.__familyRecipeStats = data.stats || null
   window.__familyRecipeMonthlyRanking = Array.isArray(data.monthlyRanking) ? data.monthlyRanking : []
-  const [rankingResponse, statsResponse] = await Promise.all([
+  const trendYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date()))
+  const [rankingResponse, statsResponse, trendResponse] = await Promise.all([
     fetch('/api/cook-events?action=ranking&period=all', { credentials: 'same-origin', cache: 'no-store' }),
     fetch('/api/cook-events?action=family-stats&period=all', { credentials: 'same-origin', cache: 'no-store' }),
+    fetch(`/api/cook-events?action=family-trend&year=${trendYear}`, { credentials: 'same-origin', cache: 'no-store' }),
   ])
   const rankingData = rankingResponse.ok ? await rankingResponse.json() : {}
   const statsData = statsResponse.ok ? await statsResponse.json() : {}
+  const trendData = trendResponse.ok ? await trendResponse.json() : {}
   window.__familyRecipeRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : window.__familyRecipeMonthlyRanking
   window.__familyCookingStats = statsData
+  window.__familyAnnualTrend = trendData
   return data.recipes || []
 }
 
@@ -36,6 +40,14 @@ export async function loadCloudFamilyStats({ period = 'month', year, month } = {
   const response = await fetch(`/api/cook-events?${params}`, { credentials: 'same-origin', cache: 'no-store' })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Family stats failed: ${response.status}`)
+  return data
+}
+
+export async function loadCloudAnnualTrend(year) {
+  const params = new URLSearchParams({ action: 'family-trend', year: String(year) })
+  const response = await fetch(`/api/cook-events?${params}`, { credentials: 'same-origin', cache: 'no-store' })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Annual trend failed: ${response.status}`)
   return data
 }
 

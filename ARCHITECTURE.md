@@ -75,6 +75,8 @@ Supabase REST + Storage
 
 ## Cooking event layer (Phase 7.2)
 
+The home annual cooking trend uses the authenticated `family-trend` action in `/api/cook-events`, with server-side aggregation and the same member attribution rules as family stats. Its SVG renderer leaves future current-year months as null and protects year navigation with a request generation guard.
+
 `api/cook-events.js` exposes authenticated event reads and writes. `lib/cook-events.js` centralizes Europe/Madrid calendar handling, recipe visibility checks, event summaries, baseline creation, and monthly ranking tie-breaks. The `recipe_cook_events` table is append-oriented and auditable; `recipes.cook_count`/`last_cooked_at` are maintained only as compatibility projections. `api/recipes.js` returns event-derived counts and the current monthly top five, while `src/cloud.js` and `src/main.js` connect the existing “记录这次” UI without introducing a second button or changing image/auth/storage behavior.
 
 ## 材料统一兼容（2026-08-01）
