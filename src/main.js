@@ -403,7 +403,7 @@ function annualTrendTemplate() {
   const rows = sortFamilyMembers(Array.isArray(annualTrend.members) ? annualTrend.members : [])
   const now = currentMadridParts()
   const canNext = annualTrendYear < now.year
-  const plot = { left: 28, right: 348, top: 16, bottom: 174 }
+  const plot = { left: 34, right: 350, top: 16, bottom: 174 }
   const plotWidth = plot.right - plot.left
   const plotHeight = plot.bottom - plot.top
   const maxValue = Math.max(1, ...rows.flatMap(row => (row.months || []).filter(value => value !== null).map(value => Number(value) || 0)))
@@ -434,7 +434,10 @@ function annualTrendTemplate() {
       if (value === null || value === undefined) return ''
       const x = xFor(index + 1)
       const y = yFor(value)
-      return `<circle class="annual-trend-point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" data-action="annual-trend-point" data-member-index="${rowIndex}" data-month="${index + 1}" data-count="${Number(value) || 0}" aria-label="${escapeHtml(shortMemberName(row.name))} ${annualTrendYear}年${index + 1}月 ${Number(value) || 0}次"></circle>`
+      const pointKey = `${rowIndex}-${index + 1}`
+      const active = annualTrendPoint?.year === annualTrendYear && annualTrendPoint.memberIndex === rowIndex && annualTrendPoint.month === index + 1
+      const attrs = `data-action="annual-trend-point" data-member-index="${rowIndex}" data-month="${index + 1}" data-count="${Number(value) || 0}" aria-label="${escapeHtml(shortMemberName(row.name))} ${annualTrendYear}年${index + 1}月 ${Number(value) || 0}次"`
+      return `<circle class="annual-trend-point${active ? ' is-active' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" data-point-key="${pointKey}" aria-hidden="true"></circle><circle class="annual-trend-point-hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" ${attrs}></circle>`
     }).join('')
     return `<g class="annual-trend-series member-${memberColor(rowIndex)}" style="--trend-color:var(--chart-member-${memberColor(rowIndex)})">${paths}${points}</g>`
   }).join('')

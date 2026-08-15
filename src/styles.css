@@ -1838,11 +1838,12 @@ body,
 .annual-trend-nav strong { white-space: nowrap; }
 .annual-trend-chart-wrap { position: relative; margin-top: 10px; }
 .annual-trend-chart { display: block; width: 100%; height: auto; overflow: visible; }
-.annual-trend-grid { stroke: var(--chart-baseline); stroke-width: 1; opacity: .42; stroke-dasharray: 2 5; }
-.annual-trend-axis-label, .annual-trend-month { fill: var(--color-text-muted); font-size: 9px; }
-.annual-trend-line { fill: none; stroke: var(--trend-color); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.annual-trend-point { fill: var(--color-surface-raised); stroke: var(--trend-color); stroke-width: 2.5; cursor: pointer; }
-.annual-trend-point:hover, .annual-trend-point:focus { fill: var(--trend-color); }
+.annual-trend-grid { stroke: var(--chart-baseline); stroke-width: .8; opacity: .25; stroke-dasharray: 2 6; }
+.annual-trend-axis-label, .annual-trend-month { fill: var(--color-text-muted); font-size: 11px; font-weight: 400; }
+.annual-trend-line { fill: none; stroke: var(--trend-color); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.annual-trend-point { fill: var(--trend-color); stroke: var(--color-surface-raised); stroke-width: 1.2; pointer-events: none; }
+.annual-trend-point.is-active { r: 5px; }
+.annual-trend-point-hit { fill: transparent; stroke: transparent; cursor: pointer; }
 .annual-trend-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; margin-top: 2px; color: var(--color-text-muted); font-size: var(--font-size-caption); }
 .annual-trend-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .annual-trend-legend i { width: 9px; height: 9px; border-radius: var(--radius-pill); background: var(--trend-color); }
