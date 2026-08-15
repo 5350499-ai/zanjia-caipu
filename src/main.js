@@ -186,6 +186,8 @@ let familyStatsYear = rankingYear
 let familyStatsMonth = rankingMonth
 let familyStats = { visible: false, members: [] }
 let familyStatsLoading = false
+let familyStatsRequestGeneration = 0
+let rankingRequestGeneration = 0
 let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
 let page = 'home'
@@ -2312,14 +2314,20 @@ async function quickCookRecipe() {
 
 async function refreshFamilyStatsOnly() {
   if (!cloudReady || currentUser?.role === 'guest') return
+  const requestGeneration = ++familyStatsRequestGeneration
+  const requestedPeriod = familyStatsPeriod
+  const requestedYear = familyStatsYear
+  const requestedMonth = familyStatsMonth
   familyStatsLoading = true
   render()
   try {
-    const statsData = await loadCloudFamilyStats({ period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth })
+    const statsData = await loadCloudFamilyStats({ period: requestedPeriod, year: requestedYear, month: requestedMonth })
+    if (requestGeneration !== familyStatsRequestGeneration || familyStatsPeriod !== requestedPeriod || familyStatsYear !== requestedYear || familyStatsMonth !== requestedMonth) return
     familyStats = statsData
   } catch (error) {
     console.warn('统计刷新失败', error)
   } finally {
+    if (requestGeneration !== familyStatsRequestGeneration) return
     familyStatsLoading = false
     render()
   }
@@ -2327,12 +2335,18 @@ async function refreshFamilyStatsOnly() {
 
 async function refreshRankingOnly() {
   if (!cloudReady) return
+  const requestGeneration = ++rankingRequestGeneration
+  const requestedPeriod = rankingPeriod
+  const requestedYear = rankingYear
+  const requestedMonth = rankingMonth
   try {
-    const rankingData = await loadCloudRanking({ period: rankingPeriod, year: rankingYear, month: rankingMonth })
+    const rankingData = await loadCloudRanking({ period: requestedPeriod, year: requestedYear, month: requestedMonth })
+    if (requestGeneration !== rankingRequestGeneration || rankingPeriod !== requestedPeriod || rankingYear !== requestedYear || rankingMonth !== requestedMonth) return
     monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
   } catch (error) {
     console.warn('排行榜刷新失败', error)
   }
+  if (requestGeneration !== rankingRequestGeneration) return
   render()
 }
 

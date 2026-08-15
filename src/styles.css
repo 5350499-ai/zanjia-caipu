@@ -1824,7 +1824,9 @@ body,
 .ranking-period-nav,
 .stats-period-nav { display: flex; align-items: center; gap: 6px; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
 .ranking-period-nav button,
-.stats-period-nav button { width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-pill); color: var(--color-brand-strong); background: var(--chart-track); font-size: 22px; line-height: 1; }
+.stats-period-nav button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; padding: 0; border: 0; border-radius: var(--radius-pill); color: var(--color-brand-strong); background: var(--chart-track); font-size: 22px; line-height: 1; }
+.ranking-period-nav strong,
+.stats-period-nav strong { white-space: nowrap; }
 .ranking-period-nav button:disabled,
 .stats-period-nav button:disabled { opacity: .32; }
 .family-stats-panel { grid-column: 1 / -1; margin-top: 2px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-raised); }
