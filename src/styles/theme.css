@@ -39,6 +39,7 @@
   --color-food-highlight: #f2ae70;
   --chart-track: #f3e8dc;
   --chart-highlight: rgba(255, 255, 255, .58);
+  --chart-baseline: #d9cfc4;
   --chart-member-1: #d46b40;
   --chart-member-1-soft: #efb08b;
   --chart-member-2: #d97883;
@@ -89,6 +90,7 @@
   --color-food-highlight: #f2ae70;
   --chart-track: #35312d;
   --chart-highlight: rgba(255, 244, 232, .26);
+  --chart-baseline: #5b554f;
   --chart-member-1: #ef925c;
   --chart-member-1-soft: #b96543;
   --chart-member-2: #ee9aa3;

@@ -181,7 +181,7 @@ let monthlyRanking = []
 let rankingPeriod = 'all'
 let rankingYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date()))
 let rankingMonth = Number(new Intl.DateTimeFormat('en', { timeZone: 'Europe/Madrid', month: 'numeric' }).format(new Date()))
-let familyStatsPeriod = 'month'
+let familyStatsPeriod = 'all'
 let familyStatsYear = rankingYear
 let familyStatsMonth = rankingMonth
 let familyStats = { visible: false, members: [] }
@@ -357,12 +357,21 @@ function shortMemberName(name) {
   return String(name || '').replace(/菜谱$/, '')
 }
 
+function sortFamilyMembers(rows) {
+  const order = ['爸爸', '妈妈', '晓晰', '晓婉']
+  return [...rows].sort((a, b) => {
+    const ai = order.indexOf(shortMemberName(a.name))
+    const bi = order.indexOf(shortMemberName(b.name))
+    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
+  })
+}
+
 function familyStatsTemplate() {
   if (currentUser?.role === 'guest' || !familyStats.visible) return ''
-  const rows = Array.isArray(familyStats.members) ? familyStats.members : []
+  const rows = sortFamilyMembers(Array.isArray(familyStats.members) ? familyStats.members : [])
   const maxCook = Math.max(1, ...rows.map(row => Number(row.cookCount) || 0))
   const maxRecipe = Math.max(1, ...rows.map(row => Number(row.recipeCount) || 0))
-  const tabs = [['month', '本月'], ['year', '本年'], ['all', '总计']].map(([value, label]) => `<button type="button" class="stats-period-tab ${familyStatsPeriod === value ? 'active' : ''}" data-stats-period="${value}">${label}</button>`).join('')
+  const tabs = [['all', '总计'], ['year', '本年'], ['month', '本月']].map(([value, label]) => `<button type="button" class="stats-period-tab ${familyStatsPeriod === value ? 'active' : ''}" data-stats-period="${value}">${label}</button>`).join('')
   const now = currentMadridParts()
   const canNext = familyStatsPeriod === 'month' ? !(familyStatsYear > now.year || (familyStatsYear === now.year && familyStatsMonth >= now.month)) : !(familyStatsPeriod === 'year' && familyStatsYear >= now.year)
   const periodNav = familyStatsPeriod === 'all' ? '' : `<div class="stats-period-nav"><button type="button" data-action="family-stats-prev" aria-label="上一个">‹</button><strong>${periodLabel(familyStatsPeriod, familyStatsYear, familyStatsMonth)}</strong><button type="button" data-action="family-stats-next" aria-label="下一个" ${canNext ? '' : 'disabled'}>›</button></div>`
@@ -371,7 +380,7 @@ function familyStatsTemplate() {
     const recipe = Number(row.recipeCount) || 0
     const cookHeight = cook ? Math.max(12, Math.round((cook / maxCook) * 100)) : 0
     const recipeHeight = recipe ? Math.max(12, Math.round((recipe / maxRecipe) * 100)) : 0
-    return `<div class="member-stat" data-member-index="${index}"><div class="member-stat-values"><span>${cook}</span><span>${recipe}</span></div><div class="member-stat-bars"><i class="member-bar cook" style="--bar-height:${cookHeight}%"></i><i class="member-bar recipe" style="--bar-height:${recipeHeight}%"></i></div><strong>${escapeHtml(shortMemberName(row.name))}</strong></div>`
+    return `<div class="member-stat" data-member-index="${index}"><div class="member-stat-values"><span><b>${cook}</b>次</span><span><b>${recipe}</b>道</span></div><div class="member-stat-bars"><i class="member-bar cook" style="--bar-height:${cookHeight}%"></i><i class="member-bar recipe" style="--bar-height:${recipeHeight}%"></i></div><strong>${escapeHtml(shortMemberName(row.name))}</strong></div>`
   }).join('')
   return `<section class="family-stats-panel" aria-label="咱家做饭记录"><div class="family-stats-heading"><h2>咱家做饭记录</h2>${periodNav}</div><div class="stats-period-tabs">${tabs}</div><div class="member-stat-chart">${bars}</div><div class="member-stat-legend"><span><i class="legend-dot cook"></i>做菜次数</span><span><i class="legend-dot recipe"></i>新增菜谱</span></div></section>`
 }
@@ -2479,10 +2488,12 @@ function goHome(fromHistory = false) {
   clearRecipeComments()
   page = 'home'
   rankingPeriod = 'all'
-  familyStatsPeriod = 'month'
+  familyStatsPeriod = 'all'
   const now = currentMadridParts()
   rankingYear = now.year; rankingMonth = now.month; familyStatsYear = now.year; familyStatsMonth = now.month
   render()
+  refreshFamilyStatsOnly().catch(() => null)
+  refreshRankingOnly().catch(() => null)
 }
 
 function clearRecipeComments() {

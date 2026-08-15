@@ -10,7 +10,7 @@ export async function loadCloudLibrary() {
   window.__familyRecipeMonthlyRanking = Array.isArray(data.monthlyRanking) ? data.monthlyRanking : []
   const [rankingResponse, statsResponse] = await Promise.all([
     fetch('/api/cook-events?action=ranking&period=all', { credentials: 'same-origin', cache: 'no-store' }),
-    fetch('/api/cook-events?action=family-stats&period=month', { credentials: 'same-origin', cache: 'no-store' }),
+    fetch('/api/cook-events?action=family-stats&period=all', { credentials: 'same-origin', cache: 'no-store' }),
   ])
   const rankingData = rankingResponse.ok ? await rankingResponse.json() : {}
   const statsData = statsResponse.ok ? await statsResponse.json() : {}
