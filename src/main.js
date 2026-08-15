@@ -2294,23 +2294,30 @@ async function quickCookRecipe() {
   }
 }
 
-async function refreshFamilyStatsAndRanking() {
+async function refreshFamilyStatsOnly() {
   if (!cloudReady || currentUser?.role === 'guest') return
   familyStatsLoading = true
   render()
   try {
-    const [statsData, rankingData] = await Promise.all([
-      loadCloudFamilyStats({ period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth }),
-      loadCloudRanking({ period: rankingPeriod, year: rankingYear, month: rankingMonth }),
-    ])
+    const statsData = await loadCloudFamilyStats({ period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth })
     familyStats = statsData
-    monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
   } catch (error) {
     console.warn('统计刷新失败', error)
   } finally {
     familyStatsLoading = false
     render()
   }
+}
+
+async function refreshRankingOnly() {
+  if (!cloudReady) return
+  try {
+    const rankingData = await loadCloudRanking({ period: rankingPeriod, year: rankingYear, month: rankingMonth })
+    monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
+  } catch (error) {
+    console.warn('排行榜刷新失败', error)
+  }
+  render()
 }
 
 function currentMadridParts() {
@@ -2323,7 +2330,7 @@ async function setFamilyStatsPeriod(period) {
   const now = currentMadridParts()
   familyStatsYear = period === 'all' ? now.year : Math.min(familyStatsYear, now.year)
   familyStatsMonth = Math.min(familyStatsMonth, familyStatsYear === now.year ? now.month : 12)
-  await refreshFamilyStatsAndRanking()
+  await refreshFamilyStatsOnly()
 }
 
 async function stepFamilyStatsPeriod(delta) {
@@ -2338,7 +2345,7 @@ async function stepFamilyStatsPeriod(delta) {
   if (familyStatsYear > now.year || (familyStatsPeriod === 'month' && familyStatsYear === now.year && familyStatsMonth > now.month)) {
     familyStatsYear = now.year; familyStatsMonth = now.month
   }
-  await refreshFamilyStatsAndRanking()
+  await refreshFamilyStatsOnly()
 }
 
 async function setRankingPeriod(period) {
@@ -2346,7 +2353,7 @@ async function setRankingPeriod(period) {
   const now = currentMadridParts()
   rankingYear = period === 'all' ? now.year : Math.min(rankingYear, now.year)
   rankingMonth = Math.min(rankingMonth, rankingYear === now.year ? now.month : 12)
-  await refreshFamilyStatsAndRanking()
+  await refreshRankingOnly()
 }
 
 async function stepRankingPeriod(delta) {
@@ -2361,7 +2368,7 @@ async function stepRankingPeriod(delta) {
   if (rankingYear > now.year || (rankingPeriod === 'month' && rankingYear === now.year && rankingMonth > now.month)) {
     rankingYear = now.year; rankingMonth = now.month
   }
-  await refreshFamilyStatsAndRanking()
+  await refreshRankingOnly()
 }
 
 function settingsMenuTemplate() {
