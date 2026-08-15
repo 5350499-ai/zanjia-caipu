@@ -1840,7 +1840,7 @@ body,
 .annual-trend-chart { display: block; width: 100%; height: auto; overflow: visible; }
 .annual-trend-axis { stroke: var(--chart-baseline); stroke-width: 1.6; opacity: .72; stroke-linecap: round; }
 .annual-trend-grid { stroke: var(--chart-baseline); stroke-width: .8; opacity: .2; stroke-dasharray: 2 6; }
-.annual-trend-axis-label, .annual-trend-month { fill: var(--color-text-muted); font-family: var(--font-family-body); font-size: 10.5px; font-weight: 400; letter-spacing: 0; }
+.annual-trend-axis-label, .annual-trend-month { fill: var(--color-text-muted); stroke: none; stroke-width: 0; font-family: var(--font-family-sans); font-size: 10.5px; font-weight: 400; letter-spacing: 0; }
 .annual-trend-line { fill: none; stroke: var(--trend-color); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .annual-trend-point { fill: var(--trend-color); stroke: var(--color-surface-raised); stroke-width: 1.2; pointer-events: none; }
 .annual-trend-point.is-active { r: 4.5px; }

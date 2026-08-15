@@ -740,9 +740,11 @@ function statsCacheKey(scope, { period = 'all', year, month } = {}) {
 async function readStatsCache(scope, params = {}) {
   const key = statsCacheKey(scope, params)
   if (!key) return null
+  const hitStage = scope === 'annual-trend' ? 'ANNUAL_TREND_CACHE_HIT' : 'STATS_CACHE_HIT'
+  const missStage = scope === 'annual-trend' ? 'ANNUAL_TREND_CACHE_MISS' : 'STATS_CACHE_MISS'
   const memory = statsMemoryCache.get(key)
   if (memory && memory.familyId === currentFamilyId()) {
-    console.info(JSON.stringify({ stage: 'STATS_CACHE_HIT', scope, key, source: 'memory' }))
+    console.info(JSON.stringify({ stage: hitStage, scope, key, source: 'memory' }))
     return memory
   }
   try {
@@ -755,13 +757,13 @@ async function readStatsCache(scope, params = {}) {
     database.close()
     if (entry?.familyId === currentFamilyId()) {
       statsMemoryCache.set(key, entry)
-      console.info(JSON.stringify({ stage: 'STATS_CACHE_HIT', scope, key, source: 'indexeddb' }))
+      console.info(JSON.stringify({ stage: hitStage, scope, key, source: 'indexeddb' }))
       return entry
     }
   } catch (error) {
-    console.info(JSON.stringify({ stage: 'STATS_CACHE_MISS', scope, key, reason: 'indexeddb_unavailable' }))
+    console.info(JSON.stringify({ stage: missStage, scope, key, reason: 'indexeddb_unavailable' }))
   }
-  console.info(JSON.stringify({ stage: 'STATS_CACHE_MISS', scope, key }))
+  console.info(JSON.stringify({ stage: missStage, scope, key }))
   return null
 }
 
