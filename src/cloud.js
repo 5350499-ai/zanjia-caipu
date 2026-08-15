@@ -50,15 +50,21 @@ export async function saveCloudLibrary(recipes) {
   return true
 }
 
-export async function saveCloudRecipe(recipe) {
+export async function saveCloudRecipe(recipe, requestId = '') {
   const response = await fetch('/api/recipes', {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(requestId ? { 'x-request-id': requestId } : {}) },
     body: JSON.stringify({ recipe }),
   })
-  if (!response.ok) throw new Error(`Cloud save failed: ${response.status}`)
-  return true
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const error = new Error(data.error || `Cloud save failed: ${response.status}`)
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+  return data.recipe || null
 }
 
 export async function deleteCloudRecipe(recipeId) {
@@ -86,24 +92,33 @@ export async function downloadCloudImage(imageId, version = '') {
   return response.blob()
 }
 
-export async function uploadCloudImage(imageId, file) {
+export async function uploadCloudImage(imageId, file, requestId = '', recipeId = '') {
   if (!imageId || !file) return false
-  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}`, {
+  const recipeQuery = recipeId ? `&recipeId=${encodeURIComponent(recipeId)}` : ''
+  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}${recipeQuery}`, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'Content-Type': file.type || 'image/jpeg' },
+    headers: { 'Content-Type': file.type || 'image/jpeg', ...(requestId ? { 'x-request-id': requestId } : {}) },
     body: file,
   })
-  if (!response.ok) throw new Error(`Image upload failed: ${response.status}`)
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    const error = new Error(data.error || `Image upload failed: ${response.status}`)
+    error.status = response.status
+    error.data = data
+    throw error
+  }
   return true
 }
 
-export async function deleteCloudImage(imageId, recipeId = '') {
+export async function deleteCloudImage(imageId, recipeId = '', requestId = '', rollback = false) {
   if (!imageId) return false
   const recipeQuery = recipeId ? `&recipeId=${encodeURIComponent(recipeId)}` : ''
-  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}${recipeQuery}`, {
+  const rollbackQuery = rollback ? '&rollback=1' : ''
+  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}${recipeQuery}${rollbackQuery}`, {
     method: 'DELETE',
     credentials: 'same-origin',
+    headers: requestId ? { 'x-request-id': requestId } : {},
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok && response.status !== 404) throw new Error(data.error || `Image delete failed: ${response.status}`)

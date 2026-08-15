@@ -128,6 +128,14 @@ function canEdit(user, row) {
   return user.role === 'admin' || (user.role !== 'guest' && row.author_user_id === user.id)
 }
 
+function requestIdOf(requestMessage) {
+  return String(requestMessage.headers['x-request-id'] || '').slice(0, 120) || null
+}
+
+function logRecipeStage(stage, details = {}) {
+  console.info(JSON.stringify({ stage, ...details }))
+}
+
 module.exports = async function handler(requestMessage, response) {
   const user = getSessionUser(requestMessage)
   if (!user) return sendJson(response, 401, { error: 'Unauthorized' })
@@ -143,27 +151,62 @@ module.exports = async function handler(requestMessage, response) {
   }
 
   if (requestMessage.method === 'POST') {
+    const requestId = requestIdOf(requestMessage)
     const { recipe } = await readJson(requestMessage)
     if (!recipe?.id || !recipe?.name) return sendJson(response, 400, { error: 'Recipe payload is incomplete' })
     const existing = await findRecipe(recipe.id)
     if (existing && !canEdit(user, existing)) return sendJson(response, 403, { error: '没有权限修改这个菜谱' })
     const row = toRow(recipe, user, existing)
-    await request('/rest/v1/recipes?on_conflict=id', {
+    logRecipeStage('RECIPE_SAVE_START', { requestId, recipeId: row.id, imageId: row.image_id || null })
+    try {
+      await request('/rest/v1/recipes?on_conflict=id', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify(row),
-    })
-    if (row.image_id) {
-      await ensureImageBaseline({ id: row.id, image_id: row.image_id, family_id: row.family_id, user_id: user.id })
-      const summary = await countRecipeEvents(row.id)
-      row.cook_count = summary.count
-      row.last_cooked_at = summary.lastCookedAt
-      await request(`/rest/v1/recipes?id=eq.${encodeFilter(row.id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ cook_count: summary.count, last_cooked_at: summary.lastCookedAt }),
       })
-      return sendJson(response, 200, { recipe: toClient(row, summary) })
+    } catch (error) {
+      logRecipeStage('RECIPE_SAVE_FAILED', { requestId, recipeId: row.id, imageId: row.image_id || null, status: error.status || null, error: error.message })
+      return sendJson(response, 503, { error: '菜谱保存失败，请重试', stage: 'RECIPE_SAVE_FAILED', requestId })
+    }
+    if (row.image_id) {
+      let bound
+      try {
+        bound = (await request('/rest/v1/recipes', { query: `?id=eq.${encodeFilter(row.id)}&select=id,image_id,image_version` }))?.[0]
+      } catch (error) {
+        logRecipeStage('IMAGE_BIND_FAILED', { requestId, recipeId: row.id, imageId: row.image_id, status: error.status || null, error: error.message })
+        return sendJson(response, 503, { error: '菜谱已提交，但图片绑定状态待确认，请刷新后检查。', imageBindUnknown: true, requestId })
+      }
+      if (!bound || bound.image_id !== row.image_id) {
+        logRecipeStage('IMAGE_BIND_FAILED', { requestId, recipeId: row.id, imageId: row.image_id, status: 409, error: 'image_id binding mismatch' })
+        return sendJson(response, 409, { error: '图片绑定未确认，请刷新后重试。', imageBindUnknown: true, requestId })
+      }
+      logRecipeStage('IMAGE_BIND_CONFIRMED', { requestId, recipeId: row.id, imageId: row.image_id, status: 200 })
+    }
+    if (row.image_id) {
+      logRecipeStage('FIRST_COOK_EVENT_ENSURE', { requestId, recipeId: row.id, imageId: row.image_id })
+      let cookEventPending = false
+      try {
+        await ensureImageBaseline({ id: row.id, image_id: row.image_id, family_id: row.family_id, user_id: user.id })
+      } catch (error) {
+        cookEventPending = true
+        logRecipeStage('COOK_EVENT_SYNC_FAILED', { requestId, recipeId: row.id, imageId: row.image_id, status: error.status || null, error: error.message })
+      }
+      let summary = { count: Number(row.cook_count || 0), lastCookedAt: row.last_cooked_at || null }
+      try {
+        summary = await countRecipeEvents(row.id)
+        row.cook_count = summary.count
+        row.last_cooked_at = summary.lastCookedAt
+        await request(`/rest/v1/recipes?id=eq.${encodeFilter(row.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ cook_count: summary.count, last_cooked_at: summary.lastCookedAt }),
+        })
+      } catch (error) {
+        cookEventPending = true
+        logRecipeStage('COOK_EVENT_SYNC_FAILED', { requestId, recipeId: row.id, imageId: row.image_id, status: error.status || null, error: error.message })
+      }
+      logRecipeStage('RECIPE_SAVE_SUCCESS', { requestId, recipeId: row.id, imageId: row.image_id, status: 200, cookEventPending })
+      return sendJson(response, 200, { recipe: toClient(row, summary), cookEventPending })
     }
     return sendJson(response, 200, { recipe: toClient(row, { count: 0, lastCookedAt: null }) })
   }

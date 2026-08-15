@@ -501,11 +501,21 @@ function persistRecipes() {
   saveCloudLibrary(serializable).catch(error => console.warn('云端同步失败，数据已保存在本机。', error))
 }
 
-async function persistSingleRecipe(recipe) {
-  await saveCloudRecipe(serializeRecipes([recipe])[0])
+async function persistSingleRecipe(recipe, requestId = '') {
+  const saved = await saveCloudRecipe(serializeRecipes([recipe])[0], requestId)
   const serializable = serializeRecipes()
   storageSet(userStorageKey(), JSON.stringify(serializable))
   writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
+  return saved
+}
+
+function createRecipeSaveRequestId() {
+  const id = globalThis.crypto?.randomUUID?.() || uniqueId('request')
+  return `recipe-save-${id}`
+}
+
+function logRecipeSave(stage, details = {}) {
+  console.info(JSON.stringify({ stage, ...details }))
 }
 
 function serializeRecipes(list = recipes) {
@@ -693,14 +703,17 @@ async function removeStoredImage(imageId, version = '') {
   })
 }
 
-async function removeRemoteImageIfSafe(imageId, recipeId, version = '') {
+async function removeRemoteImageIfSafe(imageId, recipeId, version = '', requestId = '', rollback = false) {
   if (!imageId) return { deleted: false }
   try {
-    const result = await deleteCloudImage(imageId, recipeId)
+    logRecipeSave('ROLLBACK_START', { requestId, recipeId, imageId })
+    const result = await deleteCloudImage(imageId, recipeId, requestId, rollback)
     if (result?.deleted) await removeStoredImage(imageId, version)
+    logRecipeSave('ROLLBACK_SUCCESS', { requestId, recipeId, imageId, status: 200, deleted: Boolean(result?.deleted) })
     return result
   } catch (error) {
     console.error('recipe image cleanup failed', { imageId, recipeId, error: error.message })
+    logRecipeSave('ROLLBACK_FAILED', { requestId, recipeId, imageId, status: error.status || null, error: error.message })
     window.alert('图片已从菜谱移除，但服务器旧文件清理失败，稍后可再次清理。')
     return { cleanupPending: true }
   }
@@ -1050,6 +1063,7 @@ async function saveRecipe() {
     return
   }
   const now = new Date()
+  const requestId = createRecipeSaveRequestId()
   const date = now.toLocaleDateString('sv-SE')
   const isEditing = page === 'edit'
   const current = isEditing ? findRecipeById(draftRef.id) : null
@@ -1067,11 +1081,15 @@ async function saveRecipe() {
     imageId = uniqueId(`recipe-${id}`)
     imageVersion = now.toISOString()
     try {
+      logRecipeSave('IMAGE_NORMALIZE_START', { requestId, recipeId: id, imageId })
+      logRecipeSave('IMAGE_UPLOAD_START', { requestId, recipeId: id, imageId })
       await storeImage(imageId, imageFile, imageVersion)
-      await uploadCloudImage(imageId, imageFile)
+      await uploadCloudImage(imageId, imageFile, requestId, id)
       uploadedImageId = imageId
       uploadedImageVersion = imageVersion
+      logRecipeSave('IMAGE_UPLOAD_SUCCESS', { requestId, recipeId: id, imageId, status: 200 })
     } catch (error) {
+      logRecipeSave('IMAGE_UPLOAD_FAILED', { requestId, recipeId: id, imageId, status: error.status || null, error: error.message })
       window.alert('图片保存失败，请重新选择图片。')
       if (uploadedImageId) await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
       draftBusy = false
@@ -1110,20 +1128,31 @@ async function saveRecipe() {
   const nextRecipes = isEditing ? recipes.map(item => sameId(item.id, id) ? recipe : item) : [recipe, ...recipes]
   recipes = nextRecipes
   try {
-    await persistSingleRecipe(recipe)
+    logRecipeSave('RECIPE_SAVE_START', { requestId, recipeId: id, imageId: imageId || null })
+    const savedRecipe = await persistSingleRecipe(recipe, requestId)
+    logRecipeSave('RECIPE_SAVE_SUCCESS', { requestId, recipeId: id, imageId: savedRecipe?.imageId || imageId || null, status: 200 })
+    if (imageId && savedRecipe?.imageId !== imageId) {
+      const error = new Error('Recipe image binding could not be confirmed')
+      error.stage = 'IMAGE_BIND_FAILED'
+      throw error
+    }
+    if (imageId) logRecipeSave('IMAGE_BIND_CONFIRMED', { requestId, recipeId: id, imageId })
   } catch (error) {
-    recipes = previousRecipes
-    if (uploadedImageId) {
-      if (isEditing) await removeRemoteImageIfSafe(uploadedImageId, id, uploadedImageVersion)
-      else await Promise.allSettled([removeStoredImage(uploadedImageId, uploadedImageVersion)])
+    logRecipeSave(error.stage || 'RECIPE_SAVE_FAILED', { requestId, recipeId: id, imageId: imageId || null, status: error.status || null, error: error.message })
+    const bindingUnknown = Boolean(error.data?.imageBindUnknown)
+    recipes = bindingUnknown ? nextRecipes : previousRecipes
+    if (uploadedImageId && !bindingUnknown) {
+      if (isEditing) await removeRemoteImageIfSafe(uploadedImageId, id, uploadedImageVersion, requestId)
+      else await removeRemoteImageIfSafe(uploadedImageId, id, uploadedImageVersion, requestId, true)
     }
     window.alert('菜谱保存失败，原图片已保留。')
+    if (bindingUnknown) logRecipeSave('UI_SYNC_FAILED', { requestId, recipeId: id, imageId: imageId || null, status: error.status || null, error: 'image binding status unknown' })
     draftBusy = false
     render()
     return
   }
   if ((imageFile || draftRef.removeImage) && oldImageId && oldImageId !== imageId) {
-    await removeRemoteImageIfSafe(oldImageId, id, oldImageVersion)
+    await removeRemoteImageIfSafe(oldImageId, id, oldImageVersion, requestId)
     if (current?.image?.startsWith('blob:') && current.image !== draftRef.image) URL.revokeObjectURL(current.image)
   }
   if (!isEditing) touchRecipeOpen(id)
@@ -1135,6 +1164,7 @@ async function saveRecipe() {
   draftDirty = false
   formExitPrompt = false
   draftBusy = false
+  logRecipeSave('UI_SYNC_SUCCESS', { requestId, recipeId: id, imageId: imageId || null, status: 200 })
   render()
 }
 
@@ -1709,6 +1739,7 @@ root.addEventListener('change', async event => {
     if (recipeImageBusy) return
     recipeImageBusy = true
     const uploadRecipeId = selectedId
+    const requestId = createRecipeSaveRequestId()
     const current = findRecipeById(selectedId)
     if (!current) { recipeImageBusy = false; return }
     const oldImageId = current.imageId || null
@@ -1718,7 +1749,10 @@ root.addEventListener('change', async event => {
     try {
       const normalizedFile = await normalizeImageFile(file)
       await storeImage(imageId, normalizedFile, imageVersion)
-      await uploadCloudImage(imageId, normalizedFile)
+      logRecipeSave('IMAGE_NORMALIZE_START', { requestId, recipeId: uploadRecipeId, imageId })
+      logRecipeSave('IMAGE_UPLOAD_START', { requestId, recipeId: uploadRecipeId, imageId })
+      await uploadCloudImage(imageId, normalizedFile, requestId, uploadRecipeId)
+      logRecipeSave('IMAGE_UPLOAD_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId, status: 200 })
       if (page !== 'detail' || !sameId(selectedId, uploadRecipeId)) {
         await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
         return
@@ -1727,18 +1761,24 @@ root.addEventListener('change', async event => {
       const previousRecipes = recipes
       recipes = recipes.map(recipe => sameId(recipe.id, selectedId) ? updatedRecipe : recipe)
       try {
-        await persistSingleRecipe(updatedRecipe)
+        logRecipeSave('RECIPE_SAVE_START', { requestId, recipeId: uploadRecipeId, imageId })
+        const savedRecipe = await persistSingleRecipe(updatedRecipe, requestId)
+        logRecipeSave('RECIPE_SAVE_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId: savedRecipe?.imageId || imageId, status: 200 })
+        if (savedRecipe?.imageId !== imageId) throw Object.assign(new Error('Recipe image binding could not be confirmed'), { stage: 'IMAGE_BIND_FAILED' })
+        logRecipeSave('IMAGE_BIND_CONFIRMED', { requestId, recipeId: uploadRecipeId, imageId })
       } catch (error) {
+        logRecipeSave(error.stage || 'RECIPE_SAVE_FAILED', { requestId, recipeId: uploadRecipeId, imageId, status: error.status || null, error: error.message })
         recipes = previousRecipes
-        await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion)
+        await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion, requestId)
         window.alert('菜谱保存失败，原图片已保留。')
         render()
         return
       }
-      if (oldImageId && oldImageId !== imageId) await removeRemoteImageIfSafe(oldImageId, uploadRecipeId, oldImageVersion)
+      if (oldImageId && oldImageId !== imageId) await removeRemoteImageIfSafe(oldImageId, uploadRecipeId, oldImageVersion, requestId)
       if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
       render()
     } catch (error) {
+      logRecipeSave('IMAGE_UPLOAD_FAILED', { requestId, recipeId: uploadRecipeId, imageId, status: error.status || null, error: error.message })
       await Promise.allSettled([removeStoredImage(imageId, imageVersion)])
       window.alert('图片处理或保存失败，请重新选择一张普通照片。')
     } finally {
@@ -2201,6 +2241,16 @@ async function quickCookRecipe() {
     render()
     window.alert(error?.message || '记录失败，请稍后再试')
   }
+  return saved
+}
+
+function createRecipeSaveRequestId() {
+  const id = globalThis.crypto?.randomUUID?.() || uniqueId('request')
+  return `recipe-save-${id}`
+}
+
+function logRecipeSave(stage, details = {}) {
+  console.info(JSON.stringify({ stage, ...details }))
 }
 
 function settingsMenuTemplate() {

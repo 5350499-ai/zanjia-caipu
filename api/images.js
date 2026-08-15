@@ -9,6 +9,14 @@ async function findImageRecipe(imageId) {
   return (rows || []).find(row => row.image_id === imageId || (row.cook_records || []).some(record => record.imageId === imageId)) || null
 }
 
+function requestIdOf(requestMessage) {
+  return String(requestMessage.headers['x-request-id'] || '').slice(0, 120) || null
+}
+
+function logImageStage(stage, details = {}) {
+  console.info(JSON.stringify({ stage, ...details }))
+}
+
 function canRead(user, recipe) {
   if (!recipe) return false
   if (recipe.family_id !== user.familyId) return false
@@ -168,24 +176,39 @@ module.exports = async function handler(requestMessage, response) {
   }
 
   if (requestMessage.method === 'POST') {
+    const uploadRecipeId = url.searchParams.get('recipeId')
+    if (user.role === 'guest' || (!recipe && uploadRecipeId && !imageId.startsWith(`recipe-${uploadRecipeId}-`))) return sendJson(response, 403, { error: '无权上传这张图片' })
     if (!canWrite(user, recipe)) return sendJson(response, 403, { error: '没有权限上传这张图片' })
+    const requestId = requestIdOf(requestMessage)
+    logImageStage('IMAGE_UPLOAD_START', { requestId, recipeId: uploadRecipeId || null, imageId })
     const body = await readBuffer(requestMessage)
-    await uploadStorageImage(imageId, body, requestMessage.headers['content-type'] || 'image/jpeg')
+    try {
+      await uploadStorageImage(imageId, body, requestMessage.headers['content-type'] || 'image/jpeg')
+    } catch (error) {
+      logImageStage('IMAGE_UPLOAD_FAILED', { requestId, recipeId: uploadRecipeId || null, imageId, status: error.status || null, error: error.message })
+      return sendJson(response, 502, { error: '图片上传失败，请重试', stage: 'IMAGE_UPLOAD_FAILED', requestId })
+    }
+    logImageStage('IMAGE_UPLOAD_SUCCESS', { requestId, recipeId: uploadRecipeId || null, imageId, status: 200 })
     return sendJson(response, 200, { ok: true })
   }
 
   if (requestMessage.method === 'DELETE') {
+    const requestId = requestIdOf(requestMessage)
     const recipeId = url.searchParams.get('recipeId')
+    const rollback = url.searchParams.get('rollback') === '1'
     const authorizedRecipe = recipeId
       ? (await request('/rest/v1/recipes', { query: `?id=eq.${encodeURIComponent(recipeId)}&select=id,author_user_id,family_id,is_family_shared,cook_records` }))?.[0]
       : recipe
-    if (!authorizedRecipe && user.role !== 'admin') return sendJson(response, 403, { error: '无权删除这张图片' })
+    if (!authorizedRecipe && !(rollback && recipeId && user.role !== 'guest' && imageId.startsWith(`recipe-${recipeId}-`))) return sendJson(response, 403, { error: '无权删除这张图片' })
     if (authorizedRecipe && !canWrite(user, authorizedRecipe)) return sendJson(response, 403, { error: '无权删除这张图片' })
     try {
+      logImageStage('ROLLBACK_START', { requestId, recipeId, imageId })
       const result = await deleteImageIfUnreferenced(imageId)
+      logImageStage('ROLLBACK_SUCCESS', { requestId, recipeId, imageId, status: 200, deleted: Boolean(result.deleted) })
       return sendJson(response, 200, { ok: true, ...result, message: result.deleted ? '图片已从服务器删除' : '图片仍被其他记录引用，未删除服务器文件' })
     } catch (error) {
       console.error('recipe image storage cleanup failed', { imageId, recipeId, error: error.message })
+      logImageStage('ROLLBACK_FAILED', { requestId, recipeId, imageId, status: error.status || null, error: error.message })
       return sendJson(response, 503, { ok: false, cleanupPending: true, error: '图片已从菜谱移除，但服务器旧文件清理失败，稍后可再次清理。' })
     }
     if (!canWrite(user, recipe)) return sendJson(response, 403, { error: '没有权限删除这张图片' })
