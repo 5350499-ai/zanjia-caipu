@@ -2241,16 +2241,6 @@ async function quickCookRecipe() {
     render()
     window.alert(error?.message || '记录失败，请稍后再试')
   }
-  return saved
-}
-
-function createRecipeSaveRequestId() {
-  const id = globalThis.crypto?.randomUUID?.() || uniqueId('request')
-  return `recipe-save-${id}`
-}
-
-function logRecipeSave(stage, details = {}) {
-  console.info(JSON.stringify({ stage, ...details }))
 }
 
 function settingsMenuTemplate() {
