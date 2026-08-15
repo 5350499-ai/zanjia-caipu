@@ -19,6 +19,8 @@ const IMAGE_STORE = 'images'
 const IMAGE_META_STORE = 'image-meta'
 const RECIPE_META_STORE = 'recipe-meta'
 const HOME_PRELOAD_LIMIT = 20
+const YEARLY_TREND_Y_MAX = 40
+const YEARLY_TREND_Y_TICKS = [0, 10, 20, 30, 40]
 const USER_CACHE_KEY = 'family-recipes-last-user'
 const OPEN_ORDER_KEY = 'family-recipes-open-order'
 const APP_VERSION = 'v1.0.14'
@@ -406,16 +408,13 @@ function annualTrendTemplate() {
   const plot = { left: 34, right: 350, top: 16, bottom: 174 }
   const plotWidth = plot.right - plot.left
   const plotHeight = plot.bottom - plot.top
-  const maxValue = Math.max(1, ...rows.flatMap(row => (row.months || []).filter(value => value !== null).map(value => Number(value) || 0)))
   const xFor = month => plot.left + ((month - 1) / 11) * plotWidth
-  const yFor = value => plot.bottom - ((Number(value) || 0) / maxValue) * plotHeight
-  const grid = [0, 1, 2, 3].map(step => {
-    const y = plot.bottom - (step / 3) * plotHeight
-    const value = Math.round(maxValue * (step / 3))
+  const yFor = value => plot.bottom - (Math.min(YEARLY_TREND_Y_MAX, Math.max(0, Number(value) || 0)) / YEARLY_TREND_Y_MAX) * plotHeight
+  const grid = YEARLY_TREND_Y_TICKS.map(value => {
+    const y = plot.bottom - (value / YEARLY_TREND_Y_MAX) * plotHeight
     return `<line class="annual-trend-grid" x1="${plot.left}" x2="${plot.right}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"></line><text class="annual-trend-axis-label" x="${plot.left - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${value}</text>`
   }).join('')
-  const monthLabels = Array.from({ length: 12 }, (_, index) => `<text class="annual-trend-month" x="${xFor(index + 1).toFixed(1)}" y="${plot.bottom + 20}" text-anchor="middle">${index + 1}月</text>`).join('')
-  const memberColor = index => [4, 1, 2, 3][index] || 4
+  const monthLabels = Array.from({ length: 12 }, (_, index) => `<text class="annual-trend-month" x="${xFor(index + 1).toFixed(1)}" y="${plot.bottom + 20}" text-anchor="middle">${index + 1}</text>`).join('')
   const lines = rows.map((row, rowIndex) => {
     const values = Array.isArray(row.months) ? row.months : []
     const segments = []
@@ -431,20 +430,19 @@ function annualTrendTemplate() {
     if (currentSegment.length) segments.push(currentSegment)
     const paths = segments.map(segment => `<path class="annual-trend-line" d="${segment.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ')}"></path>`).join('')
     const points = values.map((value, index) => {
-      if (value === null || value === undefined) return ''
+      if (value === null || value === undefined || Number(value) === 0) return ''
       const x = xFor(index + 1)
       const y = yFor(value)
-      const pointKey = `${rowIndex}-${index + 1}`
       const active = annualTrendPoint?.year === annualTrendYear && annualTrendPoint.memberIndex === rowIndex && annualTrendPoint.month === index + 1
       const attrs = `data-action="annual-trend-point" data-member-index="${rowIndex}" data-month="${index + 1}" data-count="${Number(value) || 0}" aria-label="${escapeHtml(shortMemberName(row.name))} ${annualTrendYear}年${index + 1}月 ${Number(value) || 0}次"`
-      return `<circle class="annual-trend-point${active ? ' is-active' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" data-point-key="${pointKey}" aria-hidden="true"></circle><circle class="annual-trend-point-hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" ${attrs}></circle>`
+      return `<circle class="annual-trend-point${active ? ' is-active' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" aria-hidden="true"></circle><circle class="annual-trend-point-hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" ${attrs}></circle>`
     }).join('')
-    return `<g class="annual-trend-series member-${memberColor(rowIndex)}" style="--trend-color:var(--chart-member-${memberColor(rowIndex)})">${paths}${points}</g>`
+    return `<g class="annual-trend-series member-${rowIndex + 1}">${paths}${points}</g>`
   }).join('')
   const tooltipRow = annualTrendPoint ? rows[annualTrendPoint.memberIndex] : null
   const tooltip = tooltipRow && annualTrendPoint.year === annualTrendYear ? `<div class="annual-trend-tooltip" role="status"><strong>${escapeHtml(shortMemberName(tooltipRow.name))}</strong><span>${annualTrendYear}年${annualTrendPoint.month}月 · ${annualTrendPoint.count}次</span></div>` : ''
-  const legend = rows.map((row, index) => `<span class="member-${memberColor(index)}"><i></i>${escapeHtml(shortMemberName(row.name))}</span>`).join('')
-  return `<section class="annual-trend-panel" aria-label="今年做饭趋势"><div class="annual-trend-heading"><h2>今年做饭趋势</h2><div class="annual-trend-nav"><button type="button" data-action="annual-trend-prev" aria-label="上一个年份">‹</button><strong>${annualTrendYear}年</strong><button type="button" data-action="annual-trend-next" aria-label="下一个年份" ${canNext ? '' : 'disabled'}>›</button></div></div><div class="annual-trend-chart-wrap"><svg class="annual-trend-chart" viewBox="0 0 360 210" role="img" aria-label="${annualTrendYear}年四位家庭成员每月做菜次数趋势">${grid}${lines}${monthLabels}</svg>${tooltip}</div><div class="annual-trend-legend">${legend}</div></section>`
+  const legend = rows.map((row, index) => `<span class="member-${index + 1}"><i></i>${escapeHtml(shortMemberName(row.name))}</span>`).join('')
+  return `<section class="annual-trend-panel" aria-label="今年做饭趋势"><div class="annual-trend-heading"><h2>今年做饭趋势</h2><div class="annual-trend-nav"><button type="button" data-action="annual-trend-prev" aria-label="上一个年份">‹</button><strong>${annualTrendYear}年</strong><button type="button" data-action="annual-trend-next" aria-label="下一个年份" ${canNext ? '' : 'disabled'}>›</button></div></div><div class="annual-trend-chart-wrap"><svg class="annual-trend-chart" viewBox="0 0 360 210" role="img" aria-label="${annualTrendYear}年四位家庭成员每月做菜次数趋势">${grid}${lines}${monthLabels}<text class="annual-trend-axis-unit" x="${plot.right}" y="${plot.bottom + 20}" text-anchor="end">月</text></svg>${tooltip}</div><div class="annual-trend-legend">${legend}</div></section>`
 }
 
 function rankingTemplate() {
