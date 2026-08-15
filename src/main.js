@@ -2344,8 +2344,16 @@ function currentMadridParts() {
 async function setFamilyStatsPeriod(period) {
   familyStatsPeriod = period
   const now = currentMadridParts()
-  familyStatsYear = period === 'all' ? now.year : Math.min(familyStatsYear, now.year)
-  familyStatsMonth = Math.min(familyStatsMonth, familyStatsYear === now.year ? now.month : 12)
+  if (period === 'all') {
+    familyStatsYear = now.year
+    familyStatsMonth = now.month
+  } else if (period === 'year') {
+    familyStatsYear = now.year
+    familyStatsMonth = now.month
+  } else {
+    familyStatsYear = now.year
+    familyStatsMonth = now.month
+  }
   await refreshFamilyStatsOnly()
 }
 
@@ -2367,8 +2375,8 @@ async function stepFamilyStatsPeriod(delta) {
 async function setRankingPeriod(period) {
   rankingPeriod = period
   const now = currentMadridParts()
-  rankingYear = period === 'all' ? now.year : Math.min(rankingYear, now.year)
-  rankingMonth = Math.min(rankingMonth, rankingYear === now.year ? now.month : 12)
+  rankingYear = now.year
+  rankingMonth = now.month
   await refreshRankingOnly()
 }
 
