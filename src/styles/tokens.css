@@ -65,4 +65,5 @@
   --shadow-bottom-bar: 0 -7px 24px rgba(48, 39, 29, .07);
   --chart-bar-height: 168px;
   --chart-bar-min-height: 12px;
+  --chart-member-label-space: 22px;
 }

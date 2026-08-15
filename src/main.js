@@ -366,6 +366,13 @@ function sortFamilyMembers(rows) {
   })
 }
 
+function visualBarPercent(value, maxValue) {
+  const amount = Number(value) || 0
+  const maximum = Math.max(1, Number(maxValue) || 0)
+  if (!amount) return 0
+  return Math.max(6, Math.round(Math.sqrt(amount / maximum) * 100))
+}
+
 function familyStatsTemplate() {
   if (currentUser?.role === 'guest' || !familyStats.visible) return ''
   const rows = sortFamilyMembers(Array.isArray(familyStats.members) ? familyStats.members : [])
@@ -378,8 +385,8 @@ function familyStatsTemplate() {
   const bars = rows.map((row, index) => {
     const cook = Number(row.cookCount) || 0
     const recipe = Number(row.recipeCount) || 0
-    const cookHeight = cook ? Math.max(12, Math.round((cook / maxCook) * 100)) : 0
-    const recipeHeight = recipe ? Math.max(12, Math.round((recipe / maxRecipe) * 100)) : 0
+    const cookHeight = visualBarPercent(cook, maxCook)
+    const recipeHeight = visualBarPercent(recipe, maxRecipe)
     return `<div class="member-stat" data-member-index="${index}"><div class="member-stat-values"><span><b>${cook}</b>次</span><span><b>${recipe}</b>道</span></div><div class="member-stat-bars"><i class="member-bar cook" style="--bar-height:${cookHeight}%"></i><i class="member-bar recipe" style="--bar-height:${recipeHeight}%"></i></div><strong>${escapeHtml(shortMemberName(row.name))}</strong></div>`
   }).join('')
   return `<section class="family-stats-panel" aria-label="咱家做饭记录"><div class="family-stats-heading"><h2>咱家做饭记录</h2>${periodNav}</div><div class="stats-period-tabs">${tabs}</div><div class="member-stat-chart">${bars}</div><div class="member-stat-legend"><span><i class="legend-dot cook"></i>做菜次数</span><span><i class="legend-dot recipe"></i>新增菜谱</span></div></section>`
