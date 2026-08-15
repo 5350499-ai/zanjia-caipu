@@ -1927,6 +1927,10 @@ root.addEventListener('click', async event => {
     return
   }
   const action = target.dataset.action
+  if (annualTrendPoint && action !== 'annual-trend-point') {
+    annualTrendPoint = null
+    if (!action) { render(); return }
+  }
   if (target.classList.contains('settings-layer') && event.target instanceof Element && event.target.closest('.settings-popover')) return
   if (action && target.closest('.settings-popover') && action !== 'close-settings') {
     settingsMenuOpen = false
