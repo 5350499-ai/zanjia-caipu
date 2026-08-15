@@ -56,6 +56,11 @@
 
 ## Future cooking-event rules (design only)
 
+## Annual cooking trends (Phase 7.6)
+
+- Annual cooking trends aggregate cook events by `cooked_on` month and member. Baseline events use `recipes.author_user_id`; other events use `recipe_cook_events.user_id`.
+- Future months in the current Europe/Madrid year remain null rather than being treated as zero.
+
 ## Cooking events Phase 7.2 (2026-08-14)
 
 - `recipe_cook_events` is the auditable source for cooking counts and future month/year rankings. Existing `recipes.cook_count` and `last_cooked_at` remain compatibility projections only.
@@ -96,3 +101,5 @@
 - 设置菜单中的“清除本地缓存”只清除当前设备菜谱快照、打开顺序、IndexedDB 图片、图片响应缓存和旧静态资源缓存，保留登录状态，不删除服务器菜谱或 Supabase Storage 图片，完成后重新同步服务器数据。
 - 管理员设置菜单可查看当前 `recipe-images` bucket 的图片数量和扫描到的总容量；若配置 `SUPABASE_STORAGE_CAPACITY_BYTES`，达到 70% 会提示管理员；当前不执行自动迁移或自动删除。
 - First-image cooking dates are immutable: the first successful finished-dish image binding uses the Europe/Madrid local date, and later image replacement, deletion, or re-upload never changes that event.
+
+- 家庭统计、排行榜和年度趋势的本地缓存只按当前 `familyId` 隔离，并采用 stale-while-revalidate；缓存不可用或过期时继续以服务端统计为准。业务事件会精准失效受影响统计缓存，图片更换和删除不改变统计缓存。
