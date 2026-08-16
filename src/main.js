@@ -190,12 +190,15 @@ let familyStatsYear = rankingYear
 let familyStatsMonth = rankingMonth
 let familyStats = { visible: false, members: [] }
 let familyStatsLoading = false
+let familyStatsDataState = 'unknown'
 let familyStatsRequestGeneration = 0
 let annualTrend = { visible: false, year: rankingYear, members: [] }
 let annualTrendYear = rankingYear
+let annualTrendDataState = 'unknown'
 let annualTrendRequestGeneration = 0
 let annualTrendPoint = null
 let rankingRequestGeneration = 0
+let rankingDataState = 'unknown'
 const statsMemoryCache = new Map()
 let cookStatus = { recipeId: null, count: 0, todayRecorded: false, loading: false, busy: false }
 let selectedId = null
@@ -457,7 +460,8 @@ function rankingTemplate() {
   const nav = rankingPeriod === 'all' ? '' : `<div class="ranking-period-nav"><button type="button" data-action="ranking-prev" aria-label="上一个">‹</button><strong>${label}</strong><button type="button" data-action="ranking-next" aria-label="下一个" ${canNext ? '' : 'disabled'}>›</button></div>`
   const tabs = [['all', '总计'], ['year', '本年'], ['month', '本月']].map(([value, text]) => `<button type="button" class="ranking-period-tab ${rankingPeriod === value ? 'active' : ''}" data-ranking-period="${value}">${text}</button>`).join('')
   const rankingRows = monthlyRanking.slice(0, 10).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
-  return `<section class="home-leaderboard" aria-label="家里最常做"><div class="home-leaderboard-heading"><h2>家里最常做</h2>${nav}</div><div class="ranking-period-tabs">${tabs}</div>${rankingRows || '<p class="home-leaderboard-empty">暂无做菜记录</p>'}</section>`
+  const emptyState = rankingDataState === 'confirmed' || rankingDataState === 'cached' ? '<p class="home-leaderboard-empty">暂无做菜记录</p>' : '<p class="home-leaderboard-loading" aria-live="polite">正在加载统计…</p>'
+  return `<section class="home-leaderboard" aria-label="家里最常做"><div class="home-leaderboard-heading"><h2>家里最常做</h2>${nav}</div><div class="ranking-period-tabs">${tabs}</div>${rankingRows || emptyState}</section>`
 }
 
 function recipePanelTemplate() {
@@ -815,6 +819,41 @@ async function invalidateStatsCacheForMutation({ familyStats = false, ranking = 
   } catch {
     // Cache invalidation is best-effort; the next freshness check revalidates.
   }
+}
+
+async function hydrateVisibleStatsFromCache() {
+  if (currentUser?.role === 'guest' || !currentFamilyId()) return false
+  const familyParams = { period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth }
+  const rankingParams = { period: rankingPeriod, year: rankingYear, month: rankingMonth }
+  const annualParams = { period: 'year', year: annualTrendYear }
+  const [familyEntry, rankingEntry, annualEntry] = await Promise.all([
+    readStatsCache('family-stats', familyParams),
+    readStatsCache('ranking', rankingParams),
+    readStatsCache('annual-trend', annualParams),
+  ])
+  let applied = false
+  if (familyEntry?.data) {
+    familyStats = familyEntry.data
+    familyStatsLoading = false
+    familyStatsDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'STATS_CACHE_APPLIED', scope: 'family-stats', key: familyEntry.key }))
+    applied = true
+  }
+  if (rankingEntry?.data) {
+    monthlyRanking = Array.isArray(rankingEntry.data.rankings) ? rankingEntry.data.rankings : []
+    rankingDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'RANKING_CACHE_HIT', key: rankingEntry.key }))
+    console.info(JSON.stringify({ stage: 'RANKING_CACHE_APPLIED', key: rankingEntry.key }))
+    applied = true
+  }
+  if (annualEntry?.data) {
+    annualTrend = annualEntry.data
+    annualTrendDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'ANNUAL_TREND_CACHE_APPLIED', key: annualEntry.key }))
+    applied = true
+  }
+  if (applied) console.info(JSON.stringify({ stage: 'HOME_STATS_RENDER_FROM_CACHE' }))
+  return applied
 }
 
 async function writeRecipeCache(serializableRecipes) {
@@ -2517,9 +2556,13 @@ async function refreshFamilyStatsOnly({ force = false } = {}) {
   if (cached?.data && requestGeneration === familyStatsRequestGeneration && familyStatsPeriod === requestedPeriod && familyStatsYear === requestedYear && familyStatsMonth === requestedMonth) {
     familyStats = cached.data
     familyStatsLoading = false
+    familyStatsDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'STATS_CACHE_APPLIED', scope: 'family-stats', key: cached.key }))
+    console.info(JSON.stringify({ stage: 'HOME_STATS_RENDER_FROM_CACHE', scope: 'family-stats' }))
     render()
   } else if (!cached) {
     familyStatsLoading = true
+    familyStatsDataState = 'loading'
     render()
   }
   if (cacheIsFresh && !force) return
@@ -2529,6 +2572,7 @@ async function refreshFamilyStatsOnly({ force = false } = {}) {
     if (requestGeneration !== familyStatsRequestGeneration || familyStatsPeriod !== requestedPeriod || familyStatsYear !== requestedYear || familyStatsMonth !== requestedMonth) return
     const unchanged = JSON.stringify(familyStats) === JSON.stringify(statsData)
     familyStats = statsData
+    familyStatsDataState = 'confirmed'
     freshDataChanged = !unchanged
     await writeStatsCache('family-stats', params, statsData)
     console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'family-stats', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
@@ -2552,6 +2596,8 @@ async function refreshAnnualTrendOnly({ force = false } = {}) {
   const cacheIsFresh = cached && Date.now() - Number(cached.updatedAt || 0) < STATS_REVALIDATE_INTERVAL_MS
   if (cached?.data && requestGeneration === annualTrendRequestGeneration && annualTrendYear === requestedYear) {
     annualTrend = cached.data
+    annualTrendDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'ANNUAL_TREND_CACHE_APPLIED', key: cached.key }))
     render()
   }
   if (cacheIsFresh && !force) return
@@ -2561,6 +2607,7 @@ async function refreshAnnualTrendOnly({ force = false } = {}) {
     if (requestGeneration !== annualTrendRequestGeneration || annualTrendYear !== requestedYear) return
     const unchanged = JSON.stringify(annualTrend) === JSON.stringify(trendData)
     annualTrend = trendData
+    annualTrendDataState = 'confirmed'
     freshDataChanged = !unchanged
     await writeStatsCache('annual-trend', params, trendData)
     console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'annual-trend', year: requestedYear }))
@@ -2583,6 +2630,9 @@ async function refreshRankingOnly({ force = false } = {}) {
   const cacheIsFresh = cached && Date.now() - Number(cached.updatedAt || 0) < STATS_REVALIDATE_INTERVAL_MS
   if (cached?.data && requestGeneration === rankingRequestGeneration && rankingPeriod === requestedPeriod && rankingYear === requestedYear && rankingMonth === requestedMonth) {
     monthlyRanking = Array.isArray(cached.data.rankings) ? cached.data.rankings : []
+    rankingDataState = 'cached'
+    console.info(JSON.stringify({ stage: 'RANKING_CACHE_HIT', key: cached.key }))
+    console.info(JSON.stringify({ stage: 'RANKING_CACHE_APPLIED', key: cached.key }))
     render()
   }
   if (cacheIsFresh && !force) return
@@ -2592,6 +2642,7 @@ async function refreshRankingOnly({ force = false } = {}) {
     if (requestGeneration !== rankingRequestGeneration || rankingPeriod !== requestedPeriod || rankingYear !== requestedYear || rankingMonth !== requestedMonth) return
     const unchanged = JSON.stringify(monthlyRanking) === JSON.stringify(Array.isArray(rankingData.rankings) ? rankingData.rankings : [])
     monthlyRanking = Array.isArray(rankingData.rankings) ? rankingData.rankings : []
+    rankingDataState = 'confirmed'
     freshDataChanged = !unchanged
     await writeStatsCache('ranking', params, rankingData)
     console.info(JSON.stringify({ stage: unchanged ? 'STATS_REVALIDATE_NO_CHANGE' : 'STATS_REVALIDATE_SUCCESS', scope: 'ranking', period: requestedPeriod, year: requestedYear, month: requestedMonth }))
@@ -2710,6 +2761,7 @@ async function startApplication() {
     recipes = loadRecipes()
     await hydrateRecipesFromIndexedDB({ renderCached: false }).catch(() => null)
     await hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), false).catch(() => null)
+    await hydrateVisibleStatsFromCache().catch(() => null)
     render()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).catch(error => console.warn('离线服务启动失败。', error))
     if (isAdmin()) loadMembers().then(render).catch(error => console.warn('成员列表读取失败。', error))
@@ -2783,9 +2835,12 @@ function goHome(fromHistory = false) {
   annualTrendYear = now.year
   annualTrendPoint = null
   render()
-  refreshFamilyStatsOnly().catch(() => null)
-  refreshAnnualTrendOnly().catch(() => null)
-  refreshRankingOnly().catch(() => null)
+  hydrateVisibleStatsFromCache().then(() => {
+    if (page === 'home') render()
+    return Promise.allSettled([refreshFamilyStatsOnly(), refreshAnnualTrendOnly(), refreshRankingOnly()])
+  }).catch(() => {
+    Promise.allSettled([refreshFamilyStatsOnly(), refreshAnnualTrendOnly(), refreshRankingOnly()]).catch(() => null)
+  })
 }
 
 function clearRecipeComments() {
