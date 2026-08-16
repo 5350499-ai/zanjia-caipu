@@ -1864,7 +1864,7 @@ body,
 .member-stat-values span { display: inline-flex; align-items: baseline; gap: 1px; }
 .member-stat-values b { color: var(--color-text-primary); font-size: 13px; font-weight: var(--font-weight-bold); }
 .member-stat-bars { width: min(58px, 100%); height: 100%; display: flex; align-items: end; justify-content: center; gap: 7px; padding: 0; background: transparent; }
-.member-bar { width: 17px; height: var(--bar-height); min-height: 0; display: block; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--member-color), var(--member-color-soft)); box-shadow: inset 1px 1px 2px var(--chart-highlight), 0 2px 5px rgba(60, 45, 30, .09); }
+.member-bar { width: 17px; height: var(--bar-height); min-height: 0; display: block; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, var(--member-color), var(--member-color-soft)); box-shadow: inset 1px 1px 2px var(--chart-highlight), 0 2px 5px rgba(60, 45, 30, .09); }
 .member-bar.recipe { opacity: .72; }
 .member-stat:nth-child(1) { --member-color: var(--chart-member-4); --member-color-soft: var(--chart-member-4-soft); }
 .member-stat:nth-child(2) { --member-color: var(--chart-member-1); --member-color-soft: var(--chart-member-1-soft); }

@@ -382,15 +382,16 @@ function sortFamilyMembers(rows) {
 }
 
 const MIN_NONZERO_BAR_HEIGHT = 4
-const MIN_NONZERO_BAR_RATIO_PERCENT = 4
 
 function visualBarHeight(value, sharedMax) {
   const amount = Number(value) || 0
   const maximum = Math.max(1, Number(sharedMax) || 0)
   if (!amount) return 0
-  const ratio = Math.min(1, Math.max(0, amount / maximum)) * 100
-  if (ratio >= MIN_NONZERO_BAR_RATIO_PERCENT) return `${ratio.toFixed(3)}%`
-  return `min(100%, calc(${ratio.toFixed(3)}% + ${MIN_NONZERO_BAR_HEIGHT}px))`
+  const ratio = Math.min(1, Math.max(0, amount / maximum))
+  if (ratio >= 1) return '100%'
+  const percentage = (ratio * 100).toFixed(3)
+  const basePixels = (MIN_NONZERO_BAR_HEIGHT * (1 - ratio)).toFixed(3)
+  return `calc(${percentage}% + ${basePixels}px)`
 }
 
 function familyStatsTemplate() {
