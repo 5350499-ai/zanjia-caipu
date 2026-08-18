@@ -1,4 +1,4 @@
-import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudAnnualTrend, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
+import { cleanupCloudImages, clearCloudImageResponseCache, clearCloudStaticResponseCache, confirmCloudRecipeImageBinding, createCloudCookEvent, deleteCloudCookEvent, deleteCloudRecipe, deleteCloudImage, downloadCloudImage, initCloud, loadCloudCookStatus, loadCloudLibrary, loadCloudFamilyStats, loadCloudAnnualTrend, loadCloudRanking, loadCloudStorageStats, saveCloudLibrary, saveCloudRecipe, uploadCloudImage } from './cloud.js'
 import { initSupabaseSessionBridge } from './supabase-session.js'
 
 const categories = ['全部', '热菜', '凉菜', '汤类', '主食', '粥类', '甜品', '肉菜', '素菜']
@@ -27,6 +27,8 @@ const USER_CACHE_KEY = 'family-recipes-last-user'
 const OPEN_ORDER_KEY = 'family-recipes-open-order'
 const APP_VERSION = 'v1.0.14'
 const THEME_KEY = 'zanjia-theme'
+const IMAGE_DECODE_TIMEOUT_MS = 12_000
+const IMAGE_ENCODE_TIMEOUT_MS = 12_000
 
 function getSafeStorage() {
   try {
@@ -212,6 +214,9 @@ let draftGeneration = 0
 let draftBusy = false
 let draftImageBusy = false
 let recipeImageBusy = false
+let recipeImageUploadGeneration = 0
+let activeRecipeImageOperation = null
+let recipeImageStatus = null
 let formExitPrompt = false
 let deleteRecipePrompt = false
 let searchIsComposing = false
@@ -250,12 +255,68 @@ const icons = {
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
 }
 
+function recipeImageStageLabel(stage) {
+  return ({ processing: '正在处理图片…', uploading: '正在上传图片…', saving: '正在保存…' })[stage] || ''
+}
+
+function recipeImageStatusFor(recipe) {
+  if (!recipeImageStatus || !sameId(recipeImageStatus.recipeId, recipe?.id)) return ''
+  return `<span class="image-upload-status" role="status" aria-live="polite">${recipeImageStageLabel(recipeImageStatus.stage)}</span>`
+}
+
+function logRecipeImageStage(stage, details = {}) {
+  console.info(JSON.stringify({ stage, ...details }))
+}
+
+function beginRecipeImageOperation(recipeId) {
+  const operation = { recipeId, generation: ++recipeImageUploadGeneration, previousRecipes: recipes }
+  activeRecipeImageOperation = operation
+  recipeImageBusy = true
+  recipeImageStatus = { recipeId, generation: operation.generation, stage: 'processing' }
+  return operation
+}
+
+function isCurrentRecipeImageOperation(operation) {
+  return activeRecipeImageOperation === operation
+    && operation.generation === recipeImageUploadGeneration
+    && page === 'detail'
+    && sameId(selectedId, operation.recipeId)
+}
+
+function setRecipeImageStage(operation, stage) {
+  if (!isCurrentRecipeImageOperation(operation)) {
+    logRecipeImageStage('UPLOAD_OPERATION_STALE', { recipeId: operation.recipeId, generation: operation.generation })
+    return false
+  }
+  recipeImageStatus = { recipeId: operation.recipeId, generation: operation.generation, stage }
+  render()
+  return true
+}
+
+function invalidateRecipeImageOperation() {
+  if (activeRecipeImageOperation?.previousRecipes) recipes = activeRecipeImageOperation.previousRecipes
+  recipeImageUploadGeneration += 1
+  activeRecipeImageOperation = null
+  recipeImageBusy = false
+  recipeImageStatus = null
+}
+
+function finishRecipeImageOperation(operation) {
+  if (activeRecipeImageOperation !== operation || operation.generation !== recipeImageUploadGeneration) return
+  activeRecipeImageOperation = null
+  recipeImageBusy = false
+  recipeImageStatus = null
+}
+
 function imageArea(recipe, compact = false) {
+  const status = recipeImageStatusFor(recipe)
+  const busy = Boolean(status)
+  if (busy && !recipe.image && page === 'detail') return `<button class="image-area placeholder" disabled aria-busy="true"><span class="camera-ring">${icons.add}</span>${status}</button>`
   if (compact) {
     if (recipe.image) return `<div class="image-area has-image compact"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></div>`
     return `<div class="image-area placeholder compact"><span class="placeholder-plus" aria-hidden="true">+</span><strong>添加图片</strong></div>`
   }
-  if (recipe.image) return `<button class="image-area has-image" data-action="view-image"><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}"></button>`
+  if (recipe.image) return `<button class="image-area has-image" data-action="view-image"${busy ? ' disabled aria-busy="true"' : ''}><img src="${recipe.image}" data-image-id="${escapeHtml(recipe.imageId || '')}" alt="${escapeHtml(recipe.name)}">${status}</button>`
   if (page === 'detail' && !canEditRecipe(recipe)) return `<div class="image-area placeholder"><span class="placeholder-plus" aria-hidden="true">+</span><strong>暂无图片</strong></div>`
   return `<button class="image-area placeholder" data-action="add-image"><span class="camera-ring">${icons.add}</span><strong>点击加图</strong><small>上传这道菜的成品照片</small></button>`
 }
@@ -658,6 +719,34 @@ function recipeImageCacheKey(recipeOrImageId, version = '') {
   return version ? `${recipeOrImageId}@${version}` : recipeOrImageId
 }
 
+function withImageTimeout(promise, timeoutMs, stage) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const error = new Error(stage)
+      error.stage = stage
+      reject(error)
+    }, timeoutMs)
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer))
+  })
+}
+
+function isHeicFile(file) {
+  return /heic|heif/i.test(`${file?.type || ''} ${file?.name || ''}`)
+}
+
+async function decodeImageWithFallback(image) {
+  try {
+    await withImageTimeout(image.decode(), IMAGE_DECODE_TIMEOUT_MS, 'IMAGE_DECODE_TIMEOUT')
+  } catch (error) {
+    if (error.stage === 'IMAGE_DECODE_TIMEOUT') throw error
+    if (image.complete && (image.naturalWidth || image.width)) return
+    await withImageTimeout(new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = () => reject(Object.assign(new Error('Image decode failed'), { stage: 'IMAGE_DECODE_FAILED' }))
+    }), IMAGE_DECODE_TIMEOUT_MS, 'IMAGE_DECODE_TIMEOUT')
+  }
+}
+
 async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {}) {
   if (!file || !file.type?.startsWith('image/')) throw new Error('请选择图片文件')
   const sourceUrl = URL.createObjectURL(file)
@@ -665,11 +754,11 @@ async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {})
     const image = new Image()
     image.decoding = 'async'
     image.src = sourceUrl
-    if (image.decode) await image.decode()
-    else await new Promise((resolve, reject) => {
+    if (image.decode) await decodeImageWithFallback(image)
+    else await withImageTimeout(new Promise((resolve, reject) => {
       image.onload = resolve
       image.onerror = () => reject(new Error('图片解码失败'))
-    })
+    }), IMAGE_DECODE_TIMEOUT_MS, 'IMAGE_DECODE_TIMEOUT')
     const sourceWidth = image.naturalWidth || image.width
     const sourceHeight = image.naturalHeight || image.height
     if (!sourceWidth || !sourceHeight) throw new Error('图片尺寸读取失败')
@@ -684,15 +773,131 @@ async function normalizeImageFile(file, { maxSize = 1600, quality = 0.82 } = {})
     context.fillStyle = '#fff'
     context.fillRect(0, 0, width, height)
     context.drawImage(image, 0, 0, width, height)
-    const blob = await new Promise((resolve, reject) => {
+    const blobPromise = new Promise((resolve, reject) => {
       canvas.toBlob(result => result ? resolve(result) : reject(new Error('图片转码失败')), 'image/jpeg', quality)
     })
+    const blob = await withImageTimeout(blobPromise, IMAGE_ENCODE_TIMEOUT_MS, 'IMAGE_ENCODE_TIMEOUT')
     return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'recipe-image'}.jpg`, {
       type: 'image/jpeg',
       lastModified: Date.now(),
     })
   } finally {
     URL.revokeObjectURL(sourceUrl)
+  }
+}
+
+async function cacheUploadedImageBestEffort(imageId, blob, imageVersion, operation, requestId) {
+  logRecipeImageStage('CACHE_WRITE_START', { requestId, recipeId: operation.recipeId, imageId })
+  try {
+    await storeImage(imageId, blob, imageVersion)
+    logRecipeImageStage('CACHE_WRITE_SUCCESS', { requestId, recipeId: operation.recipeId, imageId })
+  } catch (error) {
+    console.warn(JSON.stringify({ stage: 'CACHE_WRITE_FAILED', requestId, recipeId: operation.recipeId, imageId, error: error?.message || String(error) }))
+  }
+}
+
+function recipeImageFailureMessage(error, file) {
+  if (error?.stage === 'IMAGE_DECODE_TIMEOUT' || error?.stage === 'IMAGE_ENCODE_TIMEOUT') return '处理时间过长，请重试。'
+  if (error?.stage === 'IMAGE_DECODE_FAILED' || error?.stage === 'IMAGE_ENCODE_FAILED') return isHeicFile(file) ? '这张照片当前无法处理，请在相册中转换/截图后再上传。' : '图片处理失败，请重新选择照片。'
+  if (error?.stage === 'IMAGE_UPLOAD_TIMEOUT') return '处理时间过长，请重试。'
+  if (error?.stage === 'RECIPE_SAVE_TIMEOUT') return '处理时间过长，请重试。'
+  if (error?.stage === 'IMAGE_BIND_UNCERTAIN' || error?.stage === 'RECIPE_BIND_CONFIRM_TIMEOUT') return '图片保存状态暂时无法确认，请稍后重试。'
+  if (error?.stage === 'RECIPE_SAVE_FAILED' || error?.stage === 'IMAGE_BIND_FAILED') return '图片已上传，但菜谱保存失败，请重试。'
+  if (error?.stage === 'IMAGE_UPLOAD_FAILED' || error?.status) return '图片上传失败，请检查网络后重试。'
+  return '图片处理失败，请重新选择照片。'
+}
+
+async function handleRecipeImageUpload(event, file) {
+  if (recipeImageBusy) {
+    event.target.value = ''
+    window.alert('图片正在处理中，请稍候。')
+    return
+  }
+  const uploadRecipeId = selectedId
+  const current = findRecipeById(uploadRecipeId)
+  if (!current) { event.target.value = ''; return }
+  const operation = beginRecipeImageOperation(uploadRecipeId)
+  const requestId = createRecipeSaveRequestId()
+  const oldImageId = current.imageId || null
+  const oldImageVersion = current.imageVersion || null
+  const imageId = uniqueId(`recipe-${current.id}`)
+  const imageVersion = new Date().toISOString()
+  let normalizedFile = null
+  let uploaded = false
+  const previousRecipes = recipes
+  try {
+    logRecipeImageStage('IMAGE_PROCESS_START', { requestId, recipeId: uploadRecipeId, imageId, generation: operation.generation })
+    if (!setRecipeImageStage(operation, 'processing')) return
+    normalizedFile = await normalizeImageFile(file)
+    if (!isCurrentRecipeImageOperation(operation)) return
+    logRecipeImageStage('IMAGE_PROCESS_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId })
+    const previewRecipe = { ...current, imageId, imageVersion }
+    setRecipeImageFromBlob(previewRecipe, normalizedFile)
+    recipes = recipes.map(recipe => sameId(recipe.id, uploadRecipeId) ? previewRecipe : recipe)
+    render()
+    if (!setRecipeImageStage(operation, 'uploading')) {
+      await removeStoredImage(imageId, imageVersion).catch(() => null)
+      return
+    }
+    logRecipeImageStage('IMAGE_UPLOAD_START', { requestId, recipeId: uploadRecipeId, imageId })
+    await uploadCloudImage(imageId, normalizedFile, requestId, uploadRecipeId)
+    uploaded = true
+    logRecipeImageStage('IMAGE_UPLOAD_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId })
+    if (!isCurrentRecipeImageOperation(operation)) {
+      await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion, requestId)
+      return
+    }
+    const updatedRecipe = { ...current, imageId, imageVersion, modifiedAt: new Date().toISOString() }
+    setRecipeImageFromBlob(updatedRecipe, normalizedFile)
+    recipes = recipes.map(recipe => sameId(recipe.id, uploadRecipeId) ? updatedRecipe : recipe)
+    setRecipeImageStage(operation, 'saving')
+    logRecipeImageStage('RECIPE_SAVE_START', { requestId, recipeId: uploadRecipeId, imageId })
+    let savedRecipe
+    try {
+      savedRecipe = await persistSingleRecipe(updatedRecipe, requestId)
+      if (savedRecipe?.imageId !== imageId) throw Object.assign(new Error('Image binding failed'), { stage: 'IMAGE_BIND_FAILED' })
+    } catch (error) {
+      const needsConfirmation = error?.stage === 'RECIPE_SAVE_TIMEOUT' || error?.data?.imageBindUnknown || error?.stage === 'IMAGE_BIND_FAILED' || [502, 503, 504].includes(error?.status)
+      if (!needsConfirmation) throw Object.assign(error, { stage: error.stage || 'RECIPE_SAVE_FAILED' })
+      try {
+        const confirmation = await confirmCloudRecipeImageBinding(uploadRecipeId, imageId, imageVersion, requestId)
+        if (!confirmation.confirmed) throw Object.assign(new Error('Image binding not confirmed'), { stage: 'IMAGE_BIND_FAILED' })
+        savedRecipe = confirmation.recipe || updatedRecipe
+      } catch (confirmationError) {
+        if (confirmationError?.stage === 'RECIPE_BIND_CONFIRM_TIMEOUT') throw Object.assign(confirmationError, { stage: 'IMAGE_BIND_UNCERTAIN' })
+        throw confirmationError
+      }
+    }
+    logRecipeImageStage('RECIPE_SAVE_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId })
+    logRecipeImageStage('IMAGE_BIND_CONFIRMED', { requestId, recipeId: uploadRecipeId, imageId })
+    recipes = recipes.map(recipe => sameId(recipe.id, uploadRecipeId) ? { ...updatedRecipe, ...savedRecipe, image: updatedRecipe.image } : recipe)
+    const oldImageCleanup = oldImageId && oldImageId !== imageId
+      ? removeRemoteImageIfSafe(oldImageId, uploadRecipeId, oldImageVersion, requestId).catch(() => null)
+      : null
+    if (current.image?.startsWith('blob:')) URL.revokeObjectURL(current.image)
+    finishRecipeImageOperation(operation)
+    render()
+    void cacheUploadedImageBestEffort(imageId, normalizedFile, imageVersion, operation, requestId)
+    void oldImageCleanup
+    logRecipeImageStage('UI_IMAGE_SYNC_SUCCESS', { requestId, recipeId: uploadRecipeId, imageId })
+  } catch (error) {
+    if (!isCurrentRecipeImageOperation(operation)) {
+      logRecipeImageStage('UPLOAD_OPERATION_STALE', { requestId, recipeId: uploadRecipeId, imageId, generation: operation.generation })
+      if (uploaded) await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion, requestId).catch(() => null)
+      await removeStoredImage(imageId, imageVersion).catch(() => null)
+      return
+    }
+    logRecipeImageStage(error?.stage || 'IMAGE_PROCESS_FAILED', { requestId, recipeId: uploadRecipeId, imageId, error: error?.message || String(error) })
+    if (error?.stage === 'IMAGE_DECODE_TIMEOUT' || error?.stage === 'IMAGE_ENCODE_TIMEOUT') logRecipeImageStage('IMAGE_PROCESS_TIMEOUT', { requestId, recipeId: uploadRecipeId, imageId })
+    if (error?.stage === 'IMAGE_DECODE_FAILED' || error?.stage === 'IMAGE_ENCODE_FAILED') logRecipeImageStage('IMAGE_PROCESS_FAILED', { requestId, recipeId: uploadRecipeId, imageId })
+    if (uploaded && (error?.stage === 'IMAGE_BIND_FAILED' || error?.stage === 'RECIPE_SAVE_FAILED')) await removeRemoteImageIfSafe(imageId, uploadRecipeId, imageVersion, requestId).catch(() => null)
+    recipes = previousRecipes
+    finishRecipeImageOperation(operation)
+    render()
+    window.alert(recipeImageFailureMessage(error, file))
+  } finally {
+    event.target.value = ''
+    finishRecipeImageOperation(operation)
   }
 }
 
@@ -2020,6 +2225,10 @@ root.addEventListener('change', async event => {
     return
   }
   if (event.target.id === 'file-input') {
+    await handleRecipeImageUpload(event, file)
+    return
+  }
+  if (false) {
     if (recipeImageBusy) return
     recipeImageBusy = true
     const uploadRecipeId = selectedId
@@ -2811,6 +3020,7 @@ function startSessionWatch() {
 }
 
 function openRecipe(recipeId) {
+  invalidateRecipeImageOperation()
   const recipe = findRecipeById(recipeId)
   if (!canViewRecipe(recipe)) return
   touchRecipeOpen(recipeId)
@@ -2823,9 +3033,11 @@ function openRecipe(recipeId) {
 
 function goHome(fromHistory = false) {
   if (!fromHistory && history.state?.appPage === 'detail') {
+    invalidateRecipeImageOperation()
     history.back()
     return
   }
+  invalidateRecipeImageOperation()
   selectedId = null
   imageMenu = false
   imagePreview = false
@@ -2994,6 +3206,7 @@ window.addEventListener('popstate', event => {
     return
   }
   if (event.state?.appPage === 'detail' && event.state.recipeId) {
+    if (!sameId(selectedId, event.state.recipeId)) invalidateRecipeImageOperation()
     selectedId = event.state.recipeId
     page = 'detail'
     render()

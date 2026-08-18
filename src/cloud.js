@@ -2,6 +2,51 @@ export async function initCloud() {
   return true
 }
 
+const IMAGE_UPLOAD_TIMEOUT_MS = 30_000
+const RECIPE_SAVE_TIMEOUT_MS = 25_000
+
+function stageError(stage, message = stage) {
+  const error = new Error(message)
+  error.stage = stage
+  return error
+}
+
+async function fetchWithTimeout(input, options = {}, timeoutMs, timeoutStage) {
+  if (typeof AbortController === 'undefined') return fetch(input, options)
+  const controller = new AbortController()
+  let timer
+  try {
+    return await Promise.race([
+      fetch(input, { ...options, signal: controller.signal }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          reject(stageError(timeoutStage, timeoutStage))
+        }, timeoutMs)
+      }),
+    ])
+  } catch (error) {
+    if (error?.name === 'AbortError') throw stageError(timeoutStage, timeoutStage)
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function isRetryableUploadError(error) {
+  if (error?.stage || [400, 401, 403, 404, 409, 413, 422].includes(error?.status)) return false
+  return !error?.status || [502, 503, 504].includes(error.status)
+}
+
+async function withOneSafeRetry(operation) {
+  try {
+    return await operation()
+  } catch (error) {
+    if (!isRetryableUploadError(error)) throw error
+    return operation()
+  }
+}
+
 export async function loadCloudLibrary() {
   const response = await fetch('/api/recipes', { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw new Error(`Cloud read failed: ${response.status}`)
@@ -78,12 +123,12 @@ export async function saveCloudLibrary(recipes) {
 }
 
 export async function saveCloudRecipe(recipe, requestId = '') {
-  const response = await fetch('/api/recipes', {
+  const response = await fetchWithTimeout('/api/recipes', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(requestId ? { 'x-request-id': requestId } : {}) },
     body: JSON.stringify({ recipe }),
-  })
+  }, RECIPE_SAVE_TIMEOUT_MS, 'RECIPE_SAVE_TIMEOUT')
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     const error = new Error(data.error || `Cloud save failed: ${response.status}`)
@@ -92,6 +137,23 @@ export async function saveCloudRecipe(recipe, requestId = '') {
     throw error
   }
   return data.recipe || null
+}
+
+export async function confirmCloudRecipeImageBinding(recipeId, imageId, imageVersion = '', requestId = '') {
+  const response = await fetchWithTimeout('/api/recipes', {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: requestId ? { 'x-request-id': requestId } : {},
+  }, RECIPE_SAVE_TIMEOUT_MS, 'RECIPE_BIND_CONFIRM_TIMEOUT')
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const error = new Error(data.error || `Recipe binding confirmation failed: ${response.status}`)
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+  const recipe = (data.recipes || []).find(item => String(item.id) === String(recipeId))
+  return { confirmed: Boolean(recipe && recipe.imageId === imageId && (!imageVersion || recipe.imageVersion === imageVersion)), recipe }
 }
 
 export async function deleteCloudRecipe(recipeId) {
@@ -122,15 +184,24 @@ export async function downloadCloudImage(imageId, version = '') {
 export async function uploadCloudImage(imageId, file, requestId = '', recipeId = '') {
   if (!imageId || !file) return false
   const recipeQuery = recipeId ? `&recipeId=${encodeURIComponent(recipeId)}` : ''
-  const response = await fetch(`/api/images?imageId=${encodeURIComponent(imageId)}${recipeQuery}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': file.type || 'image/jpeg', ...(requestId ? { 'x-request-id': requestId } : {}) },
-    body: file,
+  const response = await withOneSafeRetry(async () => {
+    const result = await fetchWithTimeout(`/api/images?imageId=${encodeURIComponent(imageId)}${recipeQuery}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': file.type || 'image/jpeg', ...(requestId ? { 'x-request-id': requestId } : {}) },
+      body: file,
+    }, IMAGE_UPLOAD_TIMEOUT_MS, 'IMAGE_UPLOAD_TIMEOUT')
+    if ([502, 503, 504].includes(result.status)) {
+      const retryError = new Error(`Image upload failed: ${result.status}`)
+      retryError.status = result.status
+      throw retryError
+    }
+    return result
   })
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
     const error = new Error(data.error || `Image upload failed: ${response.status}`)
+    error.stage = 'IMAGE_UPLOAD_FAILED'
     error.status = response.status
     error.data = data
     throw error
