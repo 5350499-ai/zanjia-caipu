@@ -2097,23 +2097,47 @@ function setupHomeTabSwipe(panel) {
   const ignoredStart = target => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"], .settings-popover, .image-lightbox')
   panel.addEventListener('pointerdown', event => {
     if (page !== 'home' || viewingMember || settingsMenuOpen || imagePreview || event.pointerType === 'mouse' || event.clientX < 24 || ignoredStart(event.target)) return
-    gesture = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
+    panel.setPointerCapture?.(event.pointerId)
+    gesture = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startTime: Date.now(), horizontal: false, vertical: false, triggered: false }
   }, { passive: true })
+  panel.addEventListener('pointermove', event => {
+    if (!gesture || event.pointerId !== gesture.pointerId || gesture.triggered) return
+    const dx = event.clientX - gesture.startX
+    const dy = event.clientY - gesture.startY
+    const absX = Math.abs(dx)
+    const absY = Math.abs(dy)
+    if (gesture.vertical || (absY >= 14 && absY > absX * 1.05)) {
+      gesture.vertical = true
+      return
+    }
+    if (absX >= 14 && absX > absY * 1.05) {
+      gesture.horizontal = true
+      event.preventDefault()
+    }
+  }, { passive: false })
   panel.addEventListener('pointerup', event => {
     if (!gesture || event.pointerId !== gesture.pointerId) return
-    const { startX, startY } = gesture
-    gesture = null
+    const { startX, startY, startTime, horizontal, vertical } = gesture
     const dx = event.clientX - startX
     const dy = event.clientY - startY
-    if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.2) return
+    const absX = Math.abs(dx)
+    const absY = Math.abs(dy)
+    const duration = Date.now() - startTime
+    const normalSwipe = absX >= 36 && absX > absY * 1.05
+    const fastSwipe = absX >= 28 && duration <= 220 && absX > absY
+    if (vertical || (!horizontal && !normalSwipe && !fastSwipe)) return
     const currentIndex = HOME_SCOPE_ORDER.indexOf(activeScope)
     const nextIndex = currentIndex + (dx < 0 ? 1 : -1)
     if (currentIndex < 0 || nextIndex < 0 || nextIndex >= HOME_SCOPE_ORDER.length) return
     event.preventDefault()
+    gesture.triggered = true
+    gesture = null
     suppressHomeClickUntil = Date.now() + 500
     setHomeScope(HOME_SCOPE_ORDER[nextIndex])
   }, { passive: false })
-  panel.addEventListener('pointercancel', () => { gesture = null }, { passive: true })
+  panel.addEventListener('pointercancel', event => {
+    if (gesture?.pointerId === event.pointerId) gesture = null
+  }, { passive: true })
 }
 
 async function checkAccess() {
