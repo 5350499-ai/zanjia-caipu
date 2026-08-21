@@ -214,6 +214,7 @@ let draftGeneration = 0
 let draftBusy = false
 let draftImageBusy = false
 let recipeImageBusy = false
+let suppressHomeClickUntil = 0
 let recipeImageUploadGeneration = 0
 let activeRecipeImageOperation = null
 let recipeImageStatus = null
@@ -541,6 +542,21 @@ function recipePanelTemplate() {
   return `<div class="recipe-list">
     ${visibleRecipes.map(recipe => `<article class="recipe-card" data-action="open-recipe" data-recipe-id="${escapeHtml(recipe.id)}" role="button" tabindex="0">${imageArea(recipe, true)}<div class="card-content"><h3>${escapeHtml(recipe.name)}</h3></div></article>`).join('')}
     ${visibleRecipes.length ? leaderboard : `<div class="empty-state">${icons.search}<h3>${emptyTitle}</h3><p>${emptyHint}</p></div>`}</div>`
+}
+
+const HOME_SCOPE_ORDER = ['mine', 'shared', 'favorites']
+
+function setHomeScope(nextScope) {
+  if (!HOME_SCOPE_ORDER.includes(nextScope)) return
+  if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
+  else {
+    activeScope = nextScope
+    homeView = 'library'
+  }
+  viewingMember = null
+  settingsMenuOpen = false
+  activeCategory = '全部'
+  render()
 }
 
 function homeTemplate() {
@@ -2036,6 +2052,7 @@ function setupPullToRefresh() {
   const indicator = document.querySelector('.pull-refresh-indicator')
   if (!panel || !indicator || panel.dataset.pullReady) return
   panel.dataset.pullReady = '1'
+  setupHomeTabSwipe(panel)
   let tracking = false
   let startY = 0
   let pullDistance = 0
@@ -2071,6 +2088,32 @@ function setupPullToRefresh() {
   }
   panel.addEventListener('touchend', finish, { passive: true })
   panel.addEventListener('touchcancel', finish, { passive: true })
+}
+
+function setupHomeTabSwipe(panel) {
+  if (!panel || panel.dataset.swipeReady) return
+  panel.dataset.swipeReady = '1'
+  let gesture = null
+  const ignoredStart = target => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"], .settings-popover, .image-lightbox')
+  panel.addEventListener('pointerdown', event => {
+    if (page !== 'home' || viewingMember || settingsMenuOpen || imagePreview || event.pointerType === 'mouse' || event.clientX < 24 || ignoredStart(event.target)) return
+    gesture = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
+  }, { passive: true })
+  panel.addEventListener('pointerup', event => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return
+    const { startX, startY } = gesture
+    gesture = null
+    const dx = event.clientX - startX
+    const dy = event.clientY - startY
+    if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.2) return
+    const currentIndex = HOME_SCOPE_ORDER.indexOf(activeScope)
+    const nextIndex = currentIndex + (dx < 0 ? 1 : -1)
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= HOME_SCOPE_ORDER.length) return
+    event.preventDefault()
+    suppressHomeClickUntil = Date.now() + 500
+    setHomeScope(HOME_SCOPE_ORDER[nextIndex])
+  }, { passive: false })
+  panel.addEventListener('pointercancel', () => { gesture = null }, { passive: true })
 }
 
 async function checkAccess() {
@@ -2299,6 +2342,11 @@ root.addEventListener('error', event => {
 }, true)
 
 root.addEventListener('click', async event => {
+  if (suppressHomeClickUntil > Date.now()) {
+    suppressHomeClickUntil = 0
+    event.preventDefault()
+    return
+  }
   const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) {
     if (annualTrendPoint) { annualTrendPoint = null; render() }
@@ -2330,13 +2378,7 @@ root.addEventListener('click', async event => {
   if (action === 'annual-trend-prev') { await stepAnnualTrendYear(-1); return }
   if (action === 'annual-trend-next') { await stepAnnualTrendYear(1); return }
   if (target.dataset.scope) {
-    const nextScope = target.dataset.scope
-    if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
-    else { activeScope = nextScope; homeView = 'library' }
-    viewingMember = null
-    settingsMenuOpen = false
-    activeCategory = '全部'
-    render()
+    setHomeScope(target.dataset.scope)
     return
   }
   if (action === 'open-recipe' && target.dataset.recipeId) { openRecipe(target.dataset.recipeId); return }
