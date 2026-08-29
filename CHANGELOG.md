@@ -181,3 +181,10 @@
 ## Phase 7.6
 
 - Added the authenticated annual cooking trend card between family stats and the home ranking, with server-side monthly event aggregation, current-year future-month nulls, member color reuse, point tooltips, and guarded year navigation.
+
+## 2026-08-29 - 香港零停机发布治理接入
+
+- Added the project-level immutable-release contract at `deployment/hk-release.json`.
+- Added a local validation script for candidate/production slot, port, service,
+  atomic-cutover and rollback separation.
+- No business code, database, Supabase, Storage, DNS or Production deployment changed.

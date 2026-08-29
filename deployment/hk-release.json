@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "projectId": "zanjia-caipu",
+  "projectSlug": "zanjia-caipu",
+  "targetEnvironment": "hk-candidate",
+  "migrationClass": "NONE",
+  "releaseRoot": "/srv/apps/zanjia-caipu/releases",
+  "productionDir": "/srv/apps/zanjia-caipu/current",
+  "candidateDirPattern": "/srv/apps/zanjia-caipu/releases/<release-id>",
+  "sharedDir": "/srv/apps/zanjia-caipu/shared",
+  "backupDir": "/srv/apps/zanjia-caipu/backups",
+  "logDir": "/srv/apps/zanjia-caipu/logs",
+  "slots": {
+    "production": "BLUE",
+    "candidate": "GREEN",
+    "rollback": "BLUE"
+  },
+  "ports": {
+    "production": "loopback/tcp/18140",
+    "candidate": "loopback/tcp/18141"
+  },
+  "services": {
+    "production": "zanjia-caipu.service",
+    "candidate": "zanjia-caipu-candidate-green.service"
+  },
+  "expectedDomain": "PENDING_HK_CANDIDATE_DOMAIN",
+  "runtime": "Node.js server.cjs serving the built static app and API handlers",
+  "cutover": {
+    "proxyOwner": "SHARED_NGINX",
+    "atomicSwitch": true,
+    "postCutoverSmokeRequired": true,
+    "automaticRollbackOnSmokeFailure": true
+  },
+  "environmentContract": {
+    "secretValuesStoredOutsideRepository": true,
+    "requiredNames": [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "APP_PASSWORD",
+      "AUTH_SECRET",
+      "FAMILY_ID",
+      "ADMIN_EMAIL",
+      "ADMIN_NAME",
+      "SUPABASE_STORAGE_CAPACITY_BYTES"
+    ]
+  }
+}

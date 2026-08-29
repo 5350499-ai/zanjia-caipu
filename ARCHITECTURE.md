@@ -71,6 +71,16 @@ Supabase REST + Storage
 
 `scripts/build-static.cjs` 清理并复制静态入口到 `dist/`；`npm.cmd run build` 是生产构建命令。`vercel.json` 指定构建命令、输出目录、静态资源响应头和 no-store 策略。`server.cjs` 提供 LAN 开发预览及本地 API 路由。
 
+## 香港零停机发布治理
+
+香港候选发布遵循全局 `GLOBAL_ZERO_DOWNTIME_RELEASE_STANDARD`。项目级非敏感
+契约位于 `deployment/hk-release.json`：每个 release 使用独立 immutable 目录，
+候选与当前生产使用不同 slot、端口、service 和日志路径；通过共享 Nginx
+执行经过 readiness gates 的原子切换，切换后 smoke 失败时保留并回滚到上一
+个已验证 slot。候选环境变量只在服务器受控环境提供，仓库不保存 secret。
+本配置不改变当前 Vercel/Supabase Production；香港部署仍需先完成服务器资源、
+环境契约、候选健康和业务验收门禁。
+
 ## 已知约束
 
 ## Cooking event layer (Phase 7.2)
