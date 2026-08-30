@@ -3,8 +3,8 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_DATA_RESTORE",
-  "CURRENT_GATE": "FULL_DATABASE_COPY_PASS",
+  "CURRENT_PHASE": "HK_STORAGE_RESTORE",
+  "CURRENT_GATE": "FULL_STORAGE_COPY",
   "LAST_CONFIRMED_SAFE_POINT": "FULL_DATABASE_COPY_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
@@ -21,10 +21,14 @@
     "FULL_DATABASE_COPY"
   ],
   "FAILED_GATES": [],
-  "ACTIVE_BLOCKER": null,
+  "ACTIVE_BLOCKER": "SOURCE_PRIVATE_STORAGE_EXPORT_CREDENTIAL_UNAVAILABLE",
   "ROOT_CAUSE_EVIDENCE": [
-    "Current project is an unmodified Vercel static SPA plus Node API handlers backed by Supabase.",
-    "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required."
+    "Current project is a Vercel static SPA plus Node API handlers backed by Supabase.",
+    "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required.",
+    "Source recipe-images bucket is private; anonymous Storage list/download returned no objects/400.",
+    "Supabase connector exposes SQL and publishable keys but no private Storage object export API.",
+    "Vercel production environment pull does not expose encrypted service-role values.",
+    "Candidate database and API are independent and healthy; only image bytes are missing."
   ],
   "ATTEMPT_HISTORY": [
     "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
@@ -46,7 +50,7 @@
     "Candidate public route and final Auth credential handoff remain pending.",
     "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
   ],
-  "HUMAN_GATE": "NONE_UNTIL_INTERNAL_IAB_IS_AVAILABLE; THEN_ACCOUNT_OWNER_LOGIN_OR_MFA_ONLY_IF_REQUIRED",
+  "HUMAN_GATE": "SOURCE_STORAGE_EXPORT_CREDENTIAL_OR_APPROVED_OBJECT_EXPORT_CHANNEL_REQUIRED",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",

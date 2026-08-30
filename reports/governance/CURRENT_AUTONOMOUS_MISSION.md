@@ -1,8 +1,8 @@
 # Current Autonomous Mission
 
 - Goal: `HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER`
-- Current phase: `HK_DATA_RESTORE`
-- Current gate: `FULL_DATABASE_COPY_PASS`
+- Current phase: `HK_STORAGE_RESTORE`
+- Current gate: `FULL_STORAGE_COPY`
 - Last confirmed safe point: `FULL_DATABASE_COPY_PASS`
 - Source Production: Vercel `https://zanjia-caipu.vercel.app` with external Supabase
 - HK target: Alibaba Cloud Hong Kong `8.217.202.187`, project root `/srv/apps/zanjia-caipu`
@@ -33,6 +33,8 @@ Fenzu, game-status-radar and SizeOK. No zanjia service or directory exists.
 Database schema and all five source tables are restored in the isolated HK
 database with matching row counts. The Candidate release is running on
 loopback port 18141 with direct PostgreSQL and project-local Storage adapters.
-Next: obtain an approved private-bucket export path, migrate and reconcile
-image bytes, then complete API/functional acceptance and backup/rollback gates.
+Image migration is blocked only by the private source bucket export credential;
+anonymous access was tested and rejected. Once an approved export channel is
+available, copy/reconcile image bytes, then complete API/functional acceptance
+and backup/rollback gates.
 Do not use desktop Chrome or perform DNS cutover before the cutover gate.
