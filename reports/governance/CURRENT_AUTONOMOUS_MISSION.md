@@ -1,9 +1,9 @@
 # Current Autonomous Mission
 
 - Goal: `HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER`
-- Current phase: `HK_FUNCTIONAL_ACCEPTANCE`
-- Current gate: `AUTOMATED_FUNCTIONAL_ACCEPTANCE`
-- Last confirmed safe point: `FULL_STORAGE_COPY_AND_RECONCILIATION_PASS`
+- Current phase: `HK_CUTOVER_GATE`
+- Current gate: `ZERO_DOWNTIME_CUTOVER_READY`
+- Last confirmed safe point: `FINAL_RECONCILIATION_AND_BACKUP_PASS`
 - Source Production: Vercel `https://zanjia-caipu.vercel.app` with external Supabase
 - HK target: Alibaba Cloud Hong Kong `8.217.202.187`, project root `/srv/apps/zanjia-caipu`
 
@@ -41,8 +41,13 @@ Candidate release `c30d523` is active as
 admin login, synthetic recipe CRUD, comments and same-day cook-event duplicate
 protection smoke tests passed. Resource/restart acceptance also passed.
 
-The global Preview policy requires a human-accessible HTTPS Candidate. No
-approved temporary hostname or isolated external route is currently available;
-existing production DNS/routes remain protected. This is the only active Human
-Gate before external browser acceptance and final delta-sync evidence.
+The approved HTTPS Candidate is live at
+`https://zanjia-candidate.beeboxlab.com`, isolated from Production. External
+Guest/API/image-read, Admin session, mobile viewport, synthetic image
+upload/replace/delete, delta-sync reconciliation (77/77 IDs), resource/restart,
+and backup verification passed. Vercel and Supabase remain unchanged.
+
+`HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER=YES`. The only remaining Human Gate
+is explicit authorization for Production Cutover; no DNS or traffic switch has
+been performed.
 Do not use desktop Chrome or perform DNS cutover before the cutover gate.

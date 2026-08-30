@@ -12,7 +12,8 @@
 
 - Image read acceptance passed against the migrated 76-object project-local Storage; write-path acceptance remains in the synthetic Candidate test queue.
 - Private source bucket export is not available through the current approved connector set; anonymous Storage list/download returns no objects/400. No source Storage setting was changed.
-- External candidate URL/HTTPS route is not created; internal loopback smoke is used until a governed route is available.
+- External Candidate HTTPS: `https://zanjia-candidate.beeboxlab.com` (Nginx + Let's Encrypt), isolated from Production.
+- External guest/API/image-read and mobile viewport checks passed; Admin auth/session and synthetic image upload write path passed.
 
 ## Safety
 

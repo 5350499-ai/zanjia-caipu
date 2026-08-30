@@ -19,3 +19,5 @@ The source snapshot was collected read-only through the governed Supabase connec
 ## Delta procedure
 
 Before any future cutover, take a fresh source snapshot, copy rows changed after the snapshot watermark by primary key/modified timestamp, copy newly referenced image objects, then rerun table/key/image reconciliation. Source write freeze and final delta are cutover-gate operations and are not performed in Candidate phase.
+
+Candidate validation on 2026-08-30 executed this procedure against the public read surface: one newly observed source recipe and its image were copied by preserved ID, then source/Candidate recipe ID sets reconciled 77/77.

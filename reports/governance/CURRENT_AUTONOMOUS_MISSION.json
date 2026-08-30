@@ -3,9 +3,12 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_FUNCTIONAL_ACCEPTANCE",
-  "CURRENT_GATE": "FULL_FUNCTIONAL_ACCEPTANCE",
-  "LAST_CONFIRMED_SAFE_POINT": "TRUE_HTTPS_PREVIEW_AND_EXTERNAL_GUEST_IMAGE_PASS",
+  "MISSION_STATUS": "READY_FOR_CUTOVER",
+  "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER": "YES",
+  "CURRENT_PRODUCTION_UNCHANGED": "YES",
+  "CURRENT_PHASE": "HK_CUTOVER_GATE",
+  "CURRENT_GATE": "ZERO_DOWNTIME_CUTOVER_READY",
+  "LAST_CONFIRMED_SAFE_POINT": "FINAL_RECONCILIATION_AND_BACKUP_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
@@ -28,7 +31,15 @@
     "DATABASE_RESTORE_VERIFIED",
     "STORAGE_RESTORE_VERIFIED"
     ,"TRUE_HTTPS_PREVIEW"
-    ,"EXTERNAL_GUEST_IMAGE_ACCEPTANCE"
+    ,"EXTERNAL_GUEST_IMAGE_ACCEPTANCE",
+    "FULL_FUNCTIONAL_ACCEPTANCE",
+    "RESOURCE_ACCEPTANCE",
+    "SERVICE_RECOVERY_ACCEPTANCE",
+    "DELTA_SYNC_VALIDATED",
+    "FINAL_RECONCILIATION",
+    "BACKUP_SCOPE_READY",
+    "ROLLBACK_READY",
+    "ZERO_DOWNTIME_CUTOVER_READY"
   ],
   "FAILED_GATES": [],
   "ACTIVE_BLOCKER": null,
@@ -62,11 +73,8 @@
   "NEXT_ACTION": "Complete authenticated external functional matrix, synthetic image write/replace/delete acceptance, delta-sync validation and final cutover-readiness evidence.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
-  "P1_BLOCKERS": [
-    "Authenticated external browser matrix and full image replace/delete semantic acceptance remain; delta-sync dry-run/apply path and final ID reconciliation passed.",
-    "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
-  ],
-  "HUMAN_GATE": "NONE_UNTIL_EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
+  "P1_BLOCKERS": [],
+  "HUMAN_GATE": "EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",
