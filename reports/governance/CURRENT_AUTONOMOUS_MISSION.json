@@ -3,19 +3,21 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_SERVER_INVENTORY",
-  "CURRENT_GATE": "HUMAN_GATE_ALIBABA_AUTHENTICATED_WORKBENCH_SESSION",
-  "LAST_CONFIRMED_SAFE_POINT": "GLOBAL_ZERO_DOWNTIME_RELEASE_ADOPTION_COMPLETE",
+  "CURRENT_PHASE": "TARGET_ARCHITECTURE",
+  "CURRENT_GATE": "HK_SERVER_INVENTORY_PASS",
+  "LAST_CONFIRMED_SAFE_POINT": "HK_SERVER_INVENTORY_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
     "PROJECT_PRODUCTION_BASELINE_READ",
     "ZERO_DOWNTIME_RELEASE_ADOPTION",
     "PROJECT_RELEASE_CONTRACT_VALIDATED",
-    "HK_CAPABILITY_RESOLUTION"
+    "HK_CAPABILITY_RESOLUTION",
+    "HK_MANAGEMENT_CHANNEL",
+    "HK_SERVER_INVENTORY"
   ],
   "FAILED_GATES": [],
-  "ACTIVE_BLOCKER": "RECOVERABLE_BROWSER_CHANNEL_SELECTION_FAILURE_INTERNAL_IAB_UNAVAILABLE",
+  "ACTIVE_BLOCKER": null,
   "ROOT_CAUSE_EVIDENCE": [
     "Current project is an unmodified Vercel static SPA plus Node API handlers backed by Supabase.",
     "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required."
@@ -32,13 +34,20 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Make the Codex internal iab browser backend available, then collect read-only HK_SERVER_INVENTORY through Alibaba Cloud Workbench/Command Assistant.",
+  "NEXT_ACTION": "Decide the lightest isolated target architecture from the verified host inventory, then create source snapshot and project-scoped backup before any HK data write.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
     "HK server inventory evidence has not yet been collected in this mission."
   ],
   "HUMAN_GATE": "NONE_UNTIL_INTERNAL_IAB_IS_AVAILABLE; THEN_ACCOUNT_OWNER_LOGIN_OR_MFA_ONLY_IF_REQUIRED",
+  "HK_ACCESS_METHOD": {
+    "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
+    "profile": "fenzu-hk-oauth",
+    "instance_id": "606ce29502da4c2fad84675aacd6ac04",
+    "verified_user": "admin",
+    "secrets_output": "NONE"
+  },
   "SOURCE_PRODUCTION_SNAPSHOT": {
     "url": "https://zanjia-caipu.vercel.app",
     "platform": "Vercel + Supabase",
@@ -54,6 +63,24 @@
   },
   "DATA_RECONCILIATION_STATE": "NOT_STARTED",
   "STORAGE_RECONCILIATION_STATE": "NOT_STARTED",
+  "HK_SERVER_INVENTORY": {
+    "hostname": "iZj6cf4shuuewk2c7uvz5wZ",
+    "os": "Ubuntu 24.04.2 LTS",
+    "cpu": 2,
+    "memory_total_gib": 3.4,
+    "memory_available_gib": 1.0,
+    "swap": "0B",
+    "disk_root": "49G total / 33G free / 31% used",
+    "node": "v22.19.0",
+    "npm": "10.9.3",
+    "docker": "29.1.3",
+    "nginx": "1.24.0",
+    "postgres_engine": "16.15",
+    "ports_in_use": [80, 443, 22, 5432, 18100, 18101, 18102, 18103, 18104, 18105, 18106, 18107, 18108, 18109, 18110, 18120, 18121, 18122, 18090, 55442],
+    "existing_projects": ["fenzu-system", "game-status-radar", "sizeok"],
+    "firewall": "ufw inactive; do not change during candidate setup",
+    "resource_gate": "PASS_WITH_HEAVY_TASK_GATE"
+  },
   "CAPABILITY_RESOLUTION": {
     "required": ["database", "auth", "storage", "rest"],
     "actual_missing": [],
