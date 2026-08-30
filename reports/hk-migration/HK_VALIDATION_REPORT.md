@@ -10,7 +10,7 @@
 
 ## Pending
 
-- Image read/upload/delete acceptance is pending Storage byte migration.
+- Image read acceptance passed against the migrated 76-object project-local Storage; write-path acceptance remains in the synthetic Candidate test queue.
 - Private source bucket export is not available through the current approved connector set; anonymous Storage list/download returns no objects/400. No source Storage setting was changed.
 - External candidate URL/HTTPS route is not created; internal loopback smoke is used until a governed route is available.
 

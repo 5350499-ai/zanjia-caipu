@@ -3,9 +3,9 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_STORAGE_RESTORE",
-  "CURRENT_GATE": "FULL_STORAGE_COPY",
-  "LAST_CONFIRMED_SAFE_POINT": "FULL_DATABASE_COPY_PASS",
+  "CURRENT_PHASE": "HK_FUNCTIONAL_ACCEPTANCE",
+  "CURRENT_GATE": "AUTOMATED_FUNCTIONAL_ACCEPTANCE",
+  "LAST_CONFIRMED_SAFE_POINT": "FULL_STORAGE_COPY_AND_RECONCILIATION_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
@@ -18,21 +18,29 @@
     "HK_TARGET_ARCHITECTURE",
     "HK_PROJECT_DATABASE_PROVISIONED",
     "HK_SCHEMA_RESTORED",
-    "FULL_DATABASE_COPY"
+    "FULL_DATABASE_COPY",
+    "FULL_STORAGE_COPY",
+    "STORAGE_RECONCILIATION",
+    "BACKUP_RESTORE_DRILL",
+    "HK_CANDIDATE_DEPLOYED"
   ],
   "FAILED_GATES": [],
-  "ACTIVE_BLOCKER": "SOURCE_PRIVATE_STORAGE_EXPORT_CREDENTIAL_UNAVAILABLE",
+  "ACTIVE_BLOCKER": null,
   "ROOT_CAUSE_EVIDENCE": [
     "Current project is a Vercel static SPA plus Node API handlers backed by Supabase.",
     "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required.",
     "Source recipe-images bucket is private; anonymous Storage list/download returned no objects/400.",
     "Supabase connector exposes SQL and publishable keys but no private Storage object export API.",
     "Vercel production environment pull does not expose encrypted service-role values.",
-    "Candidate database and API are independent and healthy; only image bytes are missing."
+    "Source image bytes were safely exported through the authenticated Production Guest image API; 76 bound objects were copied and SHA-256 reconciled.",
+    "Candidate database, API and project-local Storage are independent and healthy."
   ],
   "ATTEMPT_HISTORY": [
     "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
-    "Validated global HK governance and resource preflight without remote mutation."
+    "Validated global HK governance and resource preflight without remote mutation.",
+    "Resolved private bucket export via read-only authenticated Guest API; copied 76 objects (42,021,721 bytes) with SHA-256 match.",
+    "Created project-scoped backup and completed database/storage restore drill.",
+    "Deployed Candidate c970ab5 on loopback port 18141; core guest/admin CRUD smoke passed after JSONB adapter fix c30d523."
   ],
   "FAILED_APPROACHES_DO_NOT_REPEAT": [
     "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
@@ -46,11 +54,10 @@
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
-    "Source private Storage object bytes require an approved service-role/object-export channel.",
-    "Candidate public route and final Auth credential handoff remain pending.",
+    "Candidate public route and final Auth credential handoff remain pending for external user acceptance.",
     "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
   ],
-  "HUMAN_GATE": "SOURCE_STORAGE_EXPORT_CREDENTIAL_OR_APPROVED_OBJECT_EXPORT_CHANNEL_REQUIRED",
+  "HUMAN_GATE": "NONE_UNTIL_EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",
@@ -69,10 +76,13 @@
     "candidate_slot": "GREEN",
     "production_port": "loopback/tcp/18140",
     "candidate_port": "loopback/tcp/18141",
-    "status": "NOT_DEPLOYED"
+    "status": "DEPLOYED_CANDIDATE_C30D523",
+    "release": "c30d523",
+    "service": "zanjia-caipu-candidate-green.service",
+    "health": "ACTIVE_LOOPBACK_18141"
   },
-  "DATA_RECONCILIATION_STATE": "TABLE_COUNTS_PASS_PENDING_FULL_KEY_HASH_AND_FK_CHECK",
-  "STORAGE_RECONCILIATION_STATE": "BLOCKED_SOURCE_PRIVATE_OBJECT_EXPORT",
+  "DATA_RECONCILIATION_STATE": "PASS_TABLE_COUNTS_KEY_HASHES_FK_AND_INVARIANTS",
+  "STORAGE_RECONCILIATION_STATE": "PASS_76_OBJECTS_42021721_BYTES_SHA256_MATCH",
   "HK_SERVER_INVENTORY": {
     "hostname": "iZj6cf4shuuewk2c7uvz5wZ",
     "os": "Ubuntu 24.04.2 LTS",

@@ -28,4 +28,4 @@ Canonical Alibaba Cloud Hong Kong instance `8.217.202.187`, Ubuntu 24.04.2, 2 vC
 
 ## Current gate
 
-Project-isolated database `zanjia_caipu` and role `zanjia_caipu_app` are provisioned on the shared PostgreSQL engine. Schema and all five source tables have been copied with matching row counts. Candidate service is isolated on loopback port 18141. Image bytes and a public candidate route remain pending because the source bucket is private and no source service-role/object-export credential is available through the approved local channels.
+Project-isolated database `zanjia_caipu` and role `zanjia_caipu_app` are provisioned on the shared PostgreSQL engine. Schema and all five source tables have been copied with matching row counts. Candidate service is isolated on loopback port 18141. All 76 bound image objects (42,021,721 bytes) were copied through the authenticated read-only Production image API and SHA-256 reconciled. A public candidate route remains pending for external acceptance; Production and DNS are unchanged.

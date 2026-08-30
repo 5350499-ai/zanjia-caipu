@@ -14,7 +14,7 @@ The source snapshot was collected read-only through the governed Supabase connec
 - recipe_cook_event_migration_audit: 1/1
 - Original IDs preserved.
 - PIN hashes are stored only in the target database and are not recorded in reports.
-- Storage bytes: BLOCKED pending approved private-bucket export path.
+- Storage bytes: 76 bound objects copied (42,021,721 bytes), SHA-256 reconciled.
 
 ## Delta procedure
 
