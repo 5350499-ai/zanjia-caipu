@@ -3,9 +3,9 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_FUNCTIONAL_ACCEPTANCE",
-  "CURRENT_GATE": "AUTOMATED_FUNCTIONAL_ACCEPTANCE",
-  "LAST_CONFIRMED_SAFE_POINT": "FULL_STORAGE_COPY_AND_RECONCILIATION_PASS",
+  "CURRENT_PHASE": "HK_CUTOVER_PREPARATION",
+  "CURRENT_GATE": "ZERO_DOWNTIME_CUTOVER_READY",
+  "LAST_CONFIRMED_SAFE_POINT": "FUNCTIONAL_CORE_SMOKE_AND_BACKUP_RESTORE_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
@@ -22,7 +22,11 @@
     "FULL_STORAGE_COPY",
     "STORAGE_RECONCILIATION",
     "BACKUP_RESTORE_DRILL",
-    "HK_CANDIDATE_DEPLOYED"
+    "HK_CANDIDATE_DEPLOYED",
+    "CORE_FUNCTIONAL_ACCEPTANCE",
+    "IMAGE_READ_ACCEPTANCE",
+    "DATABASE_RESTORE_VERIFIED",
+    "STORAGE_RESTORE_VERIFIED"
   ],
   "FAILED_GATES": [],
   "ACTIVE_BLOCKER": null,
@@ -50,7 +54,7 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Decide the lightest isolated target architecture from the verified host inventory, then create source snapshot and project-scoped backup before any HK data write.",
+  "NEXT_ACTION": "Complete externally reachable Candidate route/user acceptance evidence, finalize delta-sync and cutover rollback runbooks; do not cut over without explicit authorization.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
@@ -79,7 +83,8 @@
     "status": "DEPLOYED_CANDIDATE_C30D523",
     "release": "c30d523",
     "service": "zanjia-caipu-candidate-green.service",
-    "health": "ACTIVE_LOOPBACK_18141"
+    "health": "ACTIVE_LOOPBACK_18141",
+    "candidate_url": "http://127.0.0.1:18141"
   },
   "DATA_RECONCILIATION_STATE": "PASS_TABLE_COUNTS_KEY_HASHES_FK_AND_INVARIANTS",
   "STORAGE_RECONCILIATION_STATE": "PASS_76_OBJECTS_42021721_BYTES_SHA256_MATCH",
