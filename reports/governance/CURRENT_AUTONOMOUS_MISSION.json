@@ -1,0 +1,59 @@
+{
+  "MISSION_ID": "zanjia-hk-full-stack-20260830",
+  "TARGET_PROJECT": "zanjia-caipu",
+  "PRIORITY": "P0",
+  "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
+  "CURRENT_PHASE": "HK_SERVER_INVENTORY",
+  "CURRENT_GATE": "HUMAN_GATE_ALIBABA_AUTHENTICATED_WORKBENCH_SESSION",
+  "LAST_CONFIRMED_SAFE_POINT": "GLOBAL_ZERO_DOWNTIME_RELEASE_ADOPTION_COMPLETE",
+  "COMPLETED_GATES": [
+    "GLOBAL_ENGINEERING_READ",
+    "HK_CANONICAL_CONTEXT_LOADED",
+    "PROJECT_PRODUCTION_BASELINE_READ",
+    "ZERO_DOWNTIME_RELEASE_ADOPTION",
+    "PROJECT_RELEASE_CONTRACT_VALIDATED",
+    "HK_CAPABILITY_RESOLUTION"
+  ],
+  "FAILED_GATES": [],
+  "ACTIVE_BLOCKER": "ALIYUN_CONSOLE_TERMINAL_BLOCKED_AUTH_REQUIRED",
+  "ROOT_CAUSE_EVIDENCE": [
+    "Current project is an unmodified Vercel static SPA plus Node API handlers backed by Supabase.",
+    "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required."
+  ],
+  "ATTEMPT_HISTORY": [
+    "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
+    "Validated global HK governance and resource preflight without remote mutation."
+  ],
+  "FAILED_APPROACHES_DO_NOT_REPEAT": [
+    "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
+    "Do not reuse Fenzu project data services or ports.",
+    "Do not run a candidate against Production Supabase or Storage."
+  ],
+  "NEXT_ACTION": "Collect read-only HK_SERVER_INVENTORY through Alibaba Cloud Workbench/Command Assistant.",
+  "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
+  "P0_BLOCKERS": [],
+  "P1_BLOCKERS": [
+    "HK server inventory evidence has not yet been collected in this mission."
+  ],
+  "HUMAN_GATE": "ACCOUNT_OWNER_MUST_COMPLETE_ALIBABA_CLOUD_LOGIN_OR_MFA_IN_CONTROLLED_BROWSER",
+  "SOURCE_PRODUCTION_SNAPSHOT": {
+    "url": "https://zanjia-caipu.vercel.app",
+    "platform": "Vercel + Supabase",
+    "status": "UNCHANGED"
+  },
+  "HK_CANDIDATE_RELEASE": {
+    "contract": "deployment/hk-release.json",
+    "production_slot": "BLUE",
+    "candidate_slot": "GREEN",
+    "production_port": "loopback/tcp/18140",
+    "candidate_port": "loopback/tcp/18141",
+    "status": "NOT_DEPLOYED"
+  },
+  "DATA_RECONCILIATION_STATE": "NOT_STARTED",
+  "STORAGE_RECONCILIATION_STATE": "NOT_STARTED",
+  "CAPABILITY_RESOLUTION": {
+    "required": ["database", "auth", "storage", "rest"],
+    "actual_missing": [],
+    "project_scoped_resources_required": ["isolated database/role", "isolated Auth instance or compatible scope", "isolated Storage namespace", "project-bound REST/API configuration"]
+  }
+}
