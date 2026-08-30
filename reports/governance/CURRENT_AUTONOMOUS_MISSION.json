@@ -15,7 +15,7 @@
     "HK_CAPABILITY_RESOLUTION"
   ],
   "FAILED_GATES": [],
-  "ACTIVE_BLOCKER": "ALIYUN_CONSOLE_TERMINAL_BLOCKED_AUTH_REQUIRED",
+  "ACTIVE_BLOCKER": "RECOVERABLE_BROWSER_CHANNEL_SELECTION_FAILURE_INTERNAL_IAB_UNAVAILABLE",
   "ROOT_CAUSE_EVIDENCE": [
     "Current project is an unmodified Vercel static SPA plus Node API handlers backed by Supabase.",
     "HK capability resolver found no missing mapped requirements for database, auth, storage and REST; project-scoped isolation is still required."
@@ -27,15 +27,18 @@
   "FAILED_APPROACHES_DO_NOT_REPEAT": [
     "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
     "Do not reuse Fenzu project data services or ports.",
-    "Do not run a candidate against Production Supabase or Storage."
+    "Do not run a candidate against Production Supabase or Storage.",
+    "Do not depend on the user's primary desktop browser.",
+    "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
+    "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Collect read-only HK_SERVER_INVENTORY through Alibaba Cloud Workbench/Command Assistant.",
+  "NEXT_ACTION": "Make the Codex internal iab browser backend available, then collect read-only HK_SERVER_INVENTORY through Alibaba Cloud Workbench/Command Assistant.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
     "HK server inventory evidence has not yet been collected in this mission."
   ],
-  "HUMAN_GATE": "ACCOUNT_OWNER_MUST_COMPLETE_ALIBABA_CLOUD_LOGIN_OR_MFA_IN_CONTROLLED_BROWSER",
+  "HUMAN_GATE": "NONE_UNTIL_INTERNAL_IAB_IS_AVAILABLE; THEN_ACCOUNT_OWNER_LOGIN_OR_MFA_ONLY_IF_REQUIRED",
   "SOURCE_PRODUCTION_SNAPSHOT": {
     "url": "https://zanjia-caipu.vercel.app",
     "platform": "Vercel + Supabase",

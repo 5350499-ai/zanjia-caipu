@@ -16,13 +16,17 @@ Production.
 
 ## Active blocker
 
-The Alibaba Cloud console opened in the available controlled browser but is at
-the account login page; no authenticated Workbench terminal session is
-available in this context. Credentials and MFA must not be requested in chat
-or entered by the agent.
+The Codex internal `iab` browser backend is not available in this session;
+browser discovery exposed only a Chrome extension channel, which is not
+permitted for Alibaba Cloud management under the global policy. This is a
+recoverable browser-channel selection failure, not an HK infrastructure
+failure. Credentials and MFA must not be requested in chat or entered by the
+agent.
 
 ## Next safe action
 
-After the account owner completes the minimum Alibaba Cloud sign-in/MFA action
-in the controlled browser, reuse that session to collect the read-only HK
-server inventory. Do not perform DNS cutover before the cutover gate.
+After the Codex internal browser backend is made available (and, only if it is
+unauthenticated, the account owner completes the minimum Alibaba Cloud
+sign-in/MFA action there), reuse that session to collect the read-only HK
+server inventory. Do not use desktop Chrome or perform DNS cutover before the
+cutover gate.
