@@ -3,9 +3,9 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "TARGET_ARCHITECTURE",
-  "CURRENT_GATE": "HK_SERVER_INVENTORY_PASS",
-  "LAST_CONFIRMED_SAFE_POINT": "HK_SERVER_INVENTORY_PASS",
+  "CURRENT_PHASE": "HK_DATA_RESTORE",
+  "CURRENT_GATE": "FULL_DATABASE_COPY_PASS",
+  "LAST_CONFIRMED_SAFE_POINT": "FULL_DATABASE_COPY_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
@@ -14,7 +14,11 @@
     "PROJECT_RELEASE_CONTRACT_VALIDATED",
     "HK_CAPABILITY_RESOLUTION",
     "HK_MANAGEMENT_CHANNEL",
-    "HK_SERVER_INVENTORY"
+    "HK_SERVER_INVENTORY",
+    "HK_TARGET_ARCHITECTURE",
+    "HK_PROJECT_DATABASE_PROVISIONED",
+    "HK_SCHEMA_RESTORED",
+    "FULL_DATABASE_COPY"
   ],
   "FAILED_GATES": [],
   "ACTIVE_BLOCKER": null,
@@ -38,7 +42,9 @@
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
-    "HK server inventory evidence has not yet been collected in this mission."
+    "Source private Storage object bytes require an approved service-role/object-export channel.",
+    "Candidate public route and final Auth credential handoff remain pending.",
+    "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
   ],
   "HUMAN_GATE": "NONE_UNTIL_INTERNAL_IAB_IS_AVAILABLE; THEN_ACCOUNT_OWNER_LOGIN_OR_MFA_ONLY_IF_REQUIRED",
   "HK_ACCESS_METHOD": {
@@ -61,8 +67,8 @@
     "candidate_port": "loopback/tcp/18141",
     "status": "NOT_DEPLOYED"
   },
-  "DATA_RECONCILIATION_STATE": "NOT_STARTED",
-  "STORAGE_RECONCILIATION_STATE": "NOT_STARTED",
+  "DATA_RECONCILIATION_STATE": "TABLE_COUNTS_PASS_PENDING_FULL_KEY_HASH_AND_FK_CHECK",
+  "STORAGE_RECONCILIATION_STATE": "BLOCKED_SOURCE_PRIVATE_OBJECT_EXPORT",
   "HK_SERVER_INVENTORY": {
     "hostname": "iZj6cf4shuuewk2c7uvz5wZ",
     "os": "Ubuntu 24.04.2 LTS",
