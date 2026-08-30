@@ -8,6 +8,7 @@ const recipesHandler = require('./api/recipes')
 const membersHandler = require('./api/members')
 const imagesHandler = require('./api/images')
 const cookEventsHandler = require('./api/cook-events')
+const commentsHandler = require('./api/comments')
 
 const root = __dirname
 const port = Number(process.env.PORT || 5173)
@@ -23,6 +24,7 @@ const server = http.createServer(async (req, res) => {
   if (requestPath === '/api/members') return membersHandler(req, res)
   if (requestPath === '/api/images') return imagesHandler(req, res)
   if (requestPath === '/api/cook-events') return cookEventsHandler(req, res)
+  if (requestPath === '/api/comments') return commentsHandler(req, res)
   const target = path.normalize(path.join(root, requestPath === '/' ? 'index.html' : requestPath))
   if (!target.startsWith(root)) { res.writeHead(403); return res.end('Forbidden') }
   fs.readFile(target, (error, data) => {
