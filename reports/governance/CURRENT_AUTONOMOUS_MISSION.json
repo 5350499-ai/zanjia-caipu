@@ -3,8 +3,8 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_CUTOVER_PREPARATION",
-  "CURRENT_GATE": "ZERO_DOWNTIME_CUTOVER_READY",
+  "CURRENT_PHASE": "HK_EXTERNAL_CANDIDATE_ACCESS",
+  "CURRENT_GATE": "EXTERNAL_CANDIDATE_ACCESS",
   "LAST_CONFIRMED_SAFE_POINT": "FUNCTIONAL_CORE_SMOKE_AND_BACKUP_RESTORE_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
@@ -54,14 +54,14 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Complete externally reachable Candidate route/user acceptance evidence, finalize delta-sync and cutover rollback runbooks; do not cut over without explicit authorization.",
+  "NEXT_ACTION": "Obtain an approved temporary HTTPS hostname or governed external candidate route, then run browser acceptance and finish delta-sync evidence.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
-    "Candidate public route and final Auth credential handoff remain pending for external user acceptance.",
+    "No approved temporary HTTPS hostname or governed external candidate route is available; current Candidate is loopback-only.",
     "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
   ],
-  "HUMAN_GATE": "NONE_UNTIL_EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
+  "HUMAN_GATE": "APPROVED_TEMPORARY_HTTPS_CANDIDATE_HOSTNAME_REQUIRED",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",

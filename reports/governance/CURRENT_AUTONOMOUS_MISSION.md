@@ -39,7 +39,10 @@ backup and isolated database/storage restore drill passed.
 Candidate release `c30d523` is active as
 `zanjia-caipu-candidate-green.service` on loopback port 18141. Guest core API,
 admin login, synthetic recipe CRUD, comments and same-day cook-event duplicate
-protection smoke tests passed. The remaining work is full acceptance,
-resource/backup evidence, delta-sync and cutover-readiness documentation; the
-Candidate is not exposed as Production and no DNS cutover is permitted.
+protection smoke tests passed. Resource/restart acceptance also passed.
+
+The global Preview policy requires a human-accessible HTTPS Candidate. No
+approved temporary hostname or isolated external route is currently available;
+existing production DNS/routes remain protected. This is the only active Human
+Gate before external browser acceptance and final delta-sync evidence.
 Do not use desktop Chrome or perform DNS cutover before the cutover gate.
