@@ -3,9 +3,9 @@
   "TARGET_PROJECT": "zanjia-caipu",
   "PRIORITY": "P0",
   "GOAL": "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER",
-  "CURRENT_PHASE": "HK_EXTERNAL_CANDIDATE_ACCESS",
-  "CURRENT_GATE": "EXTERNAL_CANDIDATE_ACCESS",
-  "LAST_CONFIRMED_SAFE_POINT": "FUNCTIONAL_CORE_SMOKE_AND_BACKUP_RESTORE_PASS",
+  "CURRENT_PHASE": "HK_FUNCTIONAL_ACCEPTANCE",
+  "CURRENT_GATE": "FULL_FUNCTIONAL_ACCEPTANCE",
+  "LAST_CONFIRMED_SAFE_POINT": "TRUE_HTTPS_PREVIEW_AND_EXTERNAL_GUEST_IMAGE_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
     "HK_CANONICAL_CONTEXT_LOADED",
@@ -27,6 +27,8 @@
     "IMAGE_READ_ACCEPTANCE",
     "DATABASE_RESTORE_VERIFIED",
     "STORAGE_RESTORE_VERIFIED"
+    ,"TRUE_HTTPS_PREVIEW"
+    ,"EXTERNAL_GUEST_IMAGE_ACCEPTANCE"
   ],
   "FAILED_GATES": [],
   "ACTIVE_BLOCKER": null,
@@ -44,7 +46,10 @@
     "Validated global HK governance and resource preflight without remote mutation.",
     "Resolved private bucket export via read-only authenticated Guest API; copied 76 objects (42,021,721 bytes) with SHA-256 match.",
     "Created project-scoped backup and completed database/storage restore drill.",
-    "Deployed Candidate c970ab5 on loopback port 18141; core guest/admin CRUD smoke passed after JSONB adapter fix c30d523."
+    "Deployed Candidate c970ab5 on loopback port 18141; core guest/admin CRUD smoke passed after JSONB adapter fix c30d523.",
+    "Approved candidate hostname zanjia-candidate.beeboxlab.com mapped via Alibaba DNS; Nginx reverse proxy and Let's Encrypt TLS provisioned.",
+    "External HTTPS guest/API/image-read and mobile viewport acceptance passed; synthetic image upload write path returned 200 and fixture was cleaned.",
+    "Source/Candidate guest recipe ID delta dry-run detected one new source recipe; copied it with preserved ID and restored its image; final ID-set reconciliation passed 77/77."
   ],
   "FAILED_APPROACHES_DO_NOT_REPEAT": [
     "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
@@ -54,14 +59,14 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Obtain an approved temporary HTTPS hostname or governed external candidate route, then run browser acceptance and finish delta-sync evidence.",
+  "NEXT_ACTION": "Complete authenticated external functional matrix, synthetic image write/replace/delete acceptance, delta-sync validation and final cutover-readiness evidence.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [
-    "No approved temporary HTTPS hostname or governed external candidate route is available; current Candidate is loopback-only.",
+    "Authenticated external browser matrix and full image replace/delete semantic acceptance remain; delta-sync dry-run/apply path and final ID reconciliation passed.",
     "Host PostgreSQL is 16.15 while source Supabase reports PostgreSQL 17.6; schema/data copy currently passes but compatibility requires acceptance testing."
   ],
-  "HUMAN_GATE": "APPROVED_TEMPORARY_HTTPS_CANDIDATE_HOSTNAME_REQUIRED",
+  "HUMAN_GATE": "NONE_UNTIL_EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",
@@ -84,7 +89,7 @@
     "release": "c30d523",
     "service": "zanjia-caipu-candidate-green.service",
     "health": "ACTIVE_LOOPBACK_18141",
-    "candidate_url": "http://127.0.0.1:18141"
+    "candidate_url": "https://zanjia-candidate.beeboxlab.com"
   },
   "DATA_RECONCILIATION_STATE": "PASS_TABLE_COUNTS_KEY_HASHES_FK_AND_INVARIANTS",
   "STORAGE_RECONCILIATION_STATE": "PASS_76_OBJECTS_42021721_BYTES_SHA256_MATCH",
