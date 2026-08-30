@@ -24,7 +24,7 @@
     "candidate": "zanjia-caipu-candidate-green.service"
   },
   "expectedDomain": "PENDING_HK_CANDIDATE_DOMAIN",
-  "runtime": "Node.js server.cjs serving the built static app and API handlers",
+  "runtime": "Node.js server.cjs serving the built static app and API handlers with project-isolated PostgreSQL and file Storage",
   "cutover": {
     "proxyOwner": "SHARED_NGINX",
     "atomicSwitch": true,
@@ -34,9 +34,8 @@
   "environmentContract": {
     "secretValuesStoredOutsideRepository": true,
     "requiredNames": [
-      "SUPABASE_URL",
-      "SUPABASE_ANON_KEY",
-      "SUPABASE_SERVICE_ROLE_KEY",
+      "DATABASE_URL",
+      "STORAGE_ROOT",
       "APP_PASSWORD",
       "AUTH_SECRET",
       "FAMILY_ID",
