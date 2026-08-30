@@ -10,7 +10,7 @@ const imagesHandler = require('./api/images')
 const cookEventsHandler = require('./api/cook-events')
 
 const root = __dirname
-const port = 5173
+const port = Number(process.env.PORT || 5173)
 process.env.APP_PASSWORD ||= '123456'
 process.env.AUTH_SECRET ||= 'local-development-only-secret'
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' }
