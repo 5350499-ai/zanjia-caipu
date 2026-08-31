@@ -10,7 +10,7 @@ const recipes = [
   { id: 'r2', author_user_id: 'mom' },
 ]
 const events = [
-  { recipe_id: 'r1', user_id: 'dad', cooked_on: '2026-01-03T12:00:00.000Z', source: 'manual' },
+  { recipe_id: 'r1', user_id: 'dad', cooked_on: new Date('2026-01-03T12:00:00.000Z'), source: 'manual' },
   { recipe_id: 'r1', user_id: 'dad', cooked_on: '2026-08-14', source: 'manual' },
   { recipe_id: 'r2', user_id: 'mom', cooked_on: '2026-08-14T08:00:00+00:00', source: 'manual' },
   { recipe_id: 'r2', user_id: 'mom', cooked_on: '2025-12-31', source: 'manual' },
