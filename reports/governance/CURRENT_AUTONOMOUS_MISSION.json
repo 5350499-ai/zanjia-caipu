@@ -51,7 +51,8 @@
     "Supabase connector exposes SQL and publishable keys but no private Storage object export API.",
     "Vercel production environment pull does not expose encrypted service-role values.",
     "Source image bytes were safely exported through the authenticated Production Guest image API; 76 bound objects were copied and SHA-256 reconciled.",
-    "Candidate database, API and project-local Storage are independent and healthy."
+    "Candidate database, API and project-local Storage are independent and healthy.",
+    "Annual trend regression root cause: PostgreSQL DATE values arrived as JavaScript Date objects in the direct runtime; strict string-date parsing discarded every event from the annual series while all-time totals remained correct."
   ],
   "ATTEMPT_HISTORY": [
     "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
@@ -71,7 +72,7 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Observe Production and retain Vercel/Supabase as rollback references; no further cutover action pending.",
+  "NEXT_ACTION": "Observe Production; annual trend date normalization and project-scoped ephemeral Candidate cleanup completed.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [],
@@ -94,21 +95,20 @@
     "candidate_slot": "GREEN",
     "production_port": "loopback/tcp/18140",
     "candidate_port": "loopback/tcp/18141",
-    "status": "DEPLOYED_CANDIDATE_C30D523",
-    "release": "c30d523",
-    "service": "zanjia-caipu-candidate-green.service",
-    "health": "ACTIVE_LOOPBACK_18141",
-    "candidate_url": "https://zanjia-candidate.beeboxlab.com"
+    "status": "INTERNAL_EPHEMERAL_RELEASE_RETAINED_PUBLIC_ROUTE_REMOVED",
+    "release": "guest-trend-3f00e89",
+    "service": "zanjia-caipu-candidate-green.service (disabled after acceptance)",
+    "health": "IMMUTABLE_RELEASE_RETAINED"
   },
   "DATA_RECONCILIATION_STATE": "PASS_FINAL_CUTOVER_77_RECIPES_TABLE_COUNTS_KEYS_FK_INVARIANTS",
   "STORAGE_RECONCILIATION_STATE": "PASS_FINAL_CUTOVER_77_OBJECTS_42755558_BYTES_SHA256_MATCH",
   "CANONICAL_PRODUCTION_HOSTNAME": "cook.beeboxlab.com",
   "CANONICAL_PRODUCTION_URL": "https://cook.beeboxlab.com",
-  "ACTIVE_PRODUCTION_RELEASE": "prod-c30d523-20260831",
+  "ACTIVE_PRODUCTION_RELEASE": "prod-trend-3f00e89",
   "PREVIOUS_PRODUCTION_RELEASE": "Vercel Production + original Supabase",
   "CUTOVER_TIMESTAMP": "2026-08-31T08:04:00Z",
   "PRE_CUTOVER_BACKUP": "PASS",
-  "POST_CUTOVER_ACCEPTANCE": "PASS_SYNTHETIC_CRUD_IMAGE_CLEANUP_AND_EXTERNAL_SMOKE",
+  "POST_CUTOVER_ACCEPTANCE": "PASS_ANNUAL_TREND_TOTAL_RECONCILIATION_AND_ASSET_SMOKE",
   "OLD_PLATFORM_REFERENCE": "Vercel https://zanjia-caipu.vercel.app + original Supabase preserved",
   "OTHER_PROJECT_IMPACT": "NONE; Fenzu SizeOK game-status-radar healthy",
   "HK_SERVER_INVENTORY": {
