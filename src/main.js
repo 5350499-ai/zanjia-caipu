@@ -2698,7 +2698,9 @@ function statsTemplate() {
 
 function guestQuickNavTemplate() {
   if (currentUser?.role !== 'guest') return ''
-  const entries = Array.isArray(window.__familyGuestMembers) ? window.__familyGuestMembers.slice(0, 4) : []
+  const entries = Array.isArray(window.__familyGuestMembers) && window.__familyGuestMembers.length
+    ? window.__familyGuestMembers.slice(0, 4)
+    : ['爸爸', '妈妈', '晓晰', '晓婉'].map((name, key) => ({ key: String(key), name }))
   const memberButtons = entries.map(member => `<button type="button" data-guest-member="${escapeHtml(member.key)}" class="${guestMemberKey === String(member.key) ? 'active' : ''}">${escapeHtml(member.name)}</button>`).join('')
   return `<nav class="guest-quick-nav" aria-label="家庭快捷导航">${memberButtons}<button type="button" data-guest-nav="trend">做饭趋势</button><button type="button" data-guest-nav="most">最常做</button></nav>`
 }
