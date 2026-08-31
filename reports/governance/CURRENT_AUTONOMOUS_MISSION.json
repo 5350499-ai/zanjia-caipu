@@ -6,8 +6,8 @@
   "MISSION_STATUS": "READY_FOR_CUTOVER",
   "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER": "YES",
   "CURRENT_PRODUCTION_UNCHANGED": "YES",
-  "CURRENT_PHASE": "HK_CUTOVER_GATE",
-  "CURRENT_GATE": "ZERO_DOWNTIME_CUTOVER_READY",
+  "CURRENT_PHASE": "PRODUCTION_CUTOVER_HOSTNAME_GATE",
+  "CURRENT_GATE": "PERMANENT_PRODUCTION_HOSTNAME",
   "LAST_CONFIRMED_SAFE_POINT": "FINAL_RECONCILIATION_AND_BACKUP_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
@@ -70,11 +70,13 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Complete authenticated external functional matrix, synthetic image write/replace/delete acceptance, delta-sync validation and final cutover-readiness evidence.",
+  "NEXT_ACTION": "After owner approves a permanent HK Production hostname distinct from the Candidate hostname, create the isolated production route and execute atomic cutover.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
-  "P1_BLOCKERS": [],
-  "HUMAN_GATE": "EXPLICIT_PRODUCTION_CUTOVER_AUTHORIZATION",
+  "P1_BLOCKERS": [
+    "No permanent HK Production hostname is registered; current approved hostname zanjia-candidate.beeboxlab.com must remain TRUE_PREVIEW_ONLY."
+  ],
+  "HUMAN_GATE": "PERMANENT_PRODUCTION_HOSTNAME_OWNER_DECISION",
   "HK_ACCESS_METHOD": {
     "channel": "Alibaba Cloud CLI swas-open Command Assistant API",
     "profile": "fenzu-hk-oauth",
