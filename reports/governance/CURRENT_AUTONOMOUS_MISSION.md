@@ -1,15 +1,15 @@
 # Current Autonomous Mission
 
-- Goal: `HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER`
-- Current phase: `HK_CUTOVER_GATE`
-- Current gate: `ZERO_DOWNTIME_CUTOVER_READY`
-- Last confirmed safe point: `FINAL_RECONCILIATION_AND_BACKUP_PASS`
+- Goal: `PRODUCTION_CUTOVER_SUCCESS`
+- Current phase: `POST_CUTOVER_ACCEPTANCE`
+- Current gate: `PRODUCTION_FUNCTIONAL_ACCEPTANCE`
+- Last confirmed safe point: `PRODUCTION_CUTOVER_AND_SYNTHETIC_WRITE_ACCEPTANCE_PASS`
 - Source Production: Vercel `https://zanjia-caipu.vercel.app` with external Supabase
 - HK target: Alibaba Cloud Hong Kong `8.217.202.187`, project root `/srv/apps/zanjia-caipu`
 
 ## Boundaries
 
-Vercel Production, Supabase, DNS, Storage and real user data remain unchanged.
+Vercel Production and original Supabase remain online as frozen rollback references; HK DNS now serves the approved Production hostname. Real user data was not modified by acceptance tests.
 HK candidate must use isolated project database, Auth scope, Storage namespace,
 release directory, service, port, logs and backups. No candidate writes to source
 Production.
@@ -41,13 +41,16 @@ Candidate release `c30d523` is active as
 admin login, synthetic recipe CRUD, comments and same-day cook-event duplicate
 protection smoke tests passed. Resource/restart acceptance also passed.
 
-The approved HTTPS Candidate is live at
+The approved HTTPS Candidate remains live at
 `https://zanjia-candidate.beeboxlab.com`, isolated from Production. External
 Guest/API/image-read, Admin session, mobile viewport, synthetic image
 upload/replace/delete, delta-sync reconciliation (77/77 IDs), resource/restart,
 and backup verification passed. Vercel and Supabase remain unchanged.
 
-`HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER=YES`. The only remaining Human Gate
-is explicit authorization for Production Cutover; no DNS or traffic switch has
-been performed.
-Do not use desktop Chrome or perform DNS cutover before the cutover gate.
+Production is now active at `https://cook.beeboxlab.com` on immutable release
+`prod-c30d523-20260831`, independently served on loopback port 18140. HTTPS,
+DNS, API, Auth, image delivery, PWA assets, mobile shell, synthetic CRUD/image
+write acceptance, cleanup, and rollback readiness passed. Original Vercel and
+Supabase remain online and unchanged as rollback references. `cook.beeboxlab.com`
+DNS/TLS and the scoped Nginx route are project-owned; other HK projects remain
+healthy. No Production Cutover remains pending.
