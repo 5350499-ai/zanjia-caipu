@@ -248,6 +248,10 @@ textarea.form-control.tall { min-height: 130px; }
 .home-stats button.active { border-color: rgba(156, 73, 59, .38); color: #7c362d; background: #f2e3dc; box-shadow: inset 0 0 0 1px rgba(156, 73, 59, .08); }
 .home-stats .disabled { opacity: .72; }
 .home-stats strong { display: block; color: #9c493b; font-family: Georgia, serif; font-size: 18px; line-height: 1; }
+.guest-quick-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0 0 10px; }
+.guest-quick-nav button { min-width: 0; height: 34px; padding: 0 2px; border: 1px solid var(--border); border-radius: 9px; color: var(--text-muted); background: var(--card); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.guest-quick-nav button.active { color: #7c362d; border-color: rgba(156, 73, 59, .42); background: #f2e3dc; }
+.guest-quick-nav button:active { transform: scale(.98); }
 .home-stats span span,
 .home-stats button span { display: block; margin-top: 2px; }
 .detail-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 0 0 12px; }
@@ -1914,6 +1918,8 @@ body,
   color: var(--primary-text);
   background: var(--color-brand);
 }
+:root[data-theme="dark"] .guest-quick-nav button { color: var(--color-text-muted); background: var(--color-surface); border-color: var(--color-border); }
+:root[data-theme="dark"] .guest-quick-nav button.active { color: var(--primary-text); background: var(--color-brand); border-color: var(--color-brand); }
 
 /* Phase 7.3: compact detail actions and one-tap cooking completion. */
 .share-status-card {

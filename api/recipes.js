@@ -82,7 +82,7 @@ function toRow(recipe, user, existing = null) {
   }
 }
 
-async function loadVisibleRecipes(user) {
+async function loadVisibleRecipes(user, memberKey = '') {
   const select = 'id,name,categories,ingredients,seasonings,steps,tips,notes,tags,favorite_user_ids,cook_records,cook_count,last_cooked_at,image_id,image_version,author_user_id,author_name,family_id,is_family_shared,created_by_role,last_viewed_at,created_at,modified_at'
   // UI sorting is per-device and per-user; do not use the legacy global last_viewed_at field.
   let query = `?family_id=eq.${encodeFilter(user.familyId)}&select=${select}&order=created_at.desc`
@@ -95,8 +95,31 @@ async function loadVisibleRecipes(user) {
   const events = await listFamilyEvents(user.familyId)
   const visibleIds = new Set(rows.map(row => String(row.id)))
   const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
+  let guestMembers = []
+  let memberEvents = visibleEvents
+  if (user.role === 'guest') {
+    const profiles = await request('/rest/v1/family_profiles', {
+      query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc`,
+    })
+    const preferredOrder = ['爸爸', '妈妈', '晓晰', '晓婉']
+    const guestProfiles = profiles
+      .map(profile => ({ profile, name: String(profile.display_name || '').replace(/菜谱$/, '').trim() }))
+      .sort((a, b) => (preferredOrder.indexOf(a.name) < 0 ? 99 : preferredOrder.indexOf(a.name)) - (preferredOrder.indexOf(b.name) < 0 ? 99 : preferredOrder.indexOf(b.name)))
+    guestMembers = guestProfiles.map((entry, index) => ({ key: String(index), name: entry.name || `成员${index + 1}` }))
+    const selected = Number.isInteger(Number(memberKey)) ? guestProfiles[Number(memberKey)]?.profile : null
+    if (selected) memberEvents = visibleEvents.filter(event => String(event.user_id) === String(selected.id))
+  }
+  const memberRecipeIds = new Set(memberEvents.map(event => String(event.recipe_id)))
+  const latestByRecipe = new Map()
+  memberEvents.forEach(event => {
+    const key = String(event.recipe_id)
+    const cookedOn = String(event.cooked_on || '')
+    if (!latestByRecipe.has(key) || cookedOn > latestByRecipe.get(key)) latestByRecipe.set(key, cookedOn)
+  })
+  const filteredRows = user.role === 'guest' && memberKey !== '' ? rows.filter(row => memberRecipeIds.has(String(row.id))) : rows
+  if (user.role === 'guest' && memberKey !== '') filteredRows.sort((a, b) => String(latestByRecipe.get(String(b.id)) || '').localeCompare(String(latestByRecipe.get(String(a.id)) || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
   const summaries = new Map()
-  visibleEvents.forEach(event => {
+  memberEvents.forEach(event => {
     const summary = summaries.get(String(event.recipe_id)) || { count: 0, lastCookedAt: null }
     summary.count += 1
     if (!summary.lastCookedAt || String(event.cooked_on) > String(summary.lastCookedAt)) summary.lastCookedAt = event.cooked_on
@@ -104,8 +127,9 @@ async function loadVisibleRecipes(user) {
   })
   const month = madridDate().slice(0, 7)
   return {
-    recipes: rows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, lastCookedAt: null })),
-    monthlyRanking: buildMonthlyRanking(rows, visibleEvents, month),
+    recipes: filteredRows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, lastCookedAt: null })),
+    monthlyRanking: buildMonthlyRanking(filteredRows, memberEvents, month),
+    guestMembers,
   }
 }
 
@@ -141,9 +165,10 @@ module.exports = async function handler(requestMessage, response) {
   if (!user) return sendJson(response, 401, { error: 'Unauthorized' })
 
   if (requestMessage.method === 'GET') {
-    const { recipes, monthlyRanking } = await loadVisibleRecipes(user)
+    const url = new URL(requestMessage.url, 'http://local')
+    const { recipes, monthlyRanking, guestMembers } = await loadVisibleRecipes(user, url.searchParams.get('member') || '')
     const stats = await loadFamilyStats(user)
-    return sendJson(response, 200, { recipes, stats, monthlyRanking })
+    return sendJson(response, 200, { recipes, stats, monthlyRanking, guestMembers })
   }
 
   if (user.role === 'guest') {

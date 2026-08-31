@@ -181,6 +181,7 @@ let recipes = []
 
 let activeCategory = '全部'
 let activeScope = 'mine'
+let guestMemberKey = ''
 let homeView = 'home'
 let query = ''
 let monthlyRanking = []
@@ -456,7 +457,7 @@ function visualBarHeight(value, sharedMax) {
 }
 
 function familyStatsTemplate() {
-  if (currentUser?.role === 'guest' || !familyStats.visible) return ''
+  if (!familyStats.visible) return ''
   const rows = sortFamilyMembers(Array.isArray(familyStats.members) ? familyStats.members : [])
   const sharedMax = Math.max(1, ...rows.flatMap(row => [Number(row.cookCount) || 0, Number(row.recipeCount) || 0]))
   const tabs = [['all', '总计'], ['year', '本年'], ['month', '本月']].map(([value, label]) => `<button type="button" class="stats-period-tab ${familyStatsPeriod === value ? 'active' : ''}" data-stats-period="${value}">${label}</button>`).join('')
@@ -474,7 +475,7 @@ function familyStatsTemplate() {
 }
 
 function annualTrendTemplate() {
-  if (currentUser?.role === 'guest' || !annualTrend.visible) return ''
+  if (!annualTrend.visible) return ''
   const rows = sortFamilyMembers(Array.isArray(annualTrend.members) ? annualTrend.members : [])
   const now = currentMadridParts()
   const canNext = annualTrendYear < now.year
@@ -553,9 +554,28 @@ function setHomeScope(nextScope) {
     homeView = 'library'
   }
   viewingMember = null
+  guestMemberKey = ''
   settingsMenuOpen = false
   activeCategory = '全部'
   render()
+}
+
+async function selectGuestMember(memberKey) {
+  if (currentUser?.role !== 'guest' || !cloudReady) return
+  guestMemberKey = String(memberKey)
+  activeScope = 'shared'
+  activeCategory = '全部'
+  query = ''
+  homeView = 'home'
+  render()
+  try {
+    const next = await loadCloudLibrary({ memberKey: guestMemberKey })
+    recipes = next.map(({ image, ...recipe }) => ({ ...recipe, image: null }))
+    render()
+    hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(() => null)
+  } catch (error) {
+    console.warn('家庭成员菜谱读取失败。', error)
+  }
 }
 
 function homeTemplate() {
@@ -566,7 +586,7 @@ function homeTemplate() {
         ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
-      <div class="home-scope-controls">${statsTemplate()}</div>
+      <div class="home-scope-controls">${statsTemplate()}</div>${guestQuickNavTemplate()}
       <div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div></header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
@@ -1047,7 +1067,7 @@ async function invalidateStatsCacheForMutation({ familyStats = false, ranking = 
 }
 
 async function hydrateVisibleStatsFromCache() {
-  if (currentUser?.role === 'guest' || !currentFamilyId()) return false
+  if (!currentFamilyId()) return false
   const familyParams = { period: familyStatsPeriod, year: familyStatsYear, month: familyStatsMonth }
   const rankingParams = { period: rankingPeriod, year: rankingYear, month: rankingMonth }
   const annualParams = { period: 'year', year: annualTrendYear }
@@ -1384,7 +1404,8 @@ async function preloadHomeImages(limit = HOME_PRELOAD_LIMIT) {
 async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
-    const cloudRecipes = await loadCloudLibrary()
+    const previousGuestMembers = JSON.stringify(Array.isArray(window.__familyGuestMembers) ? window.__familyGuestMembers : [])
+    const cloudRecipes = await loadCloudLibrary({ memberKey: currentUser?.role === 'guest' ? guestMemberKey : '' })
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
     const currentRecipeImages = new Map(recipes.map(recipe => [String(recipe.id), { imageId: recipe.imageId, imageVersion: recipe.imageVersion, image: recipe.image }]))
@@ -1392,12 +1413,15 @@ async function syncCloudLibrary({ force = false } = {}) {
       const currentImage = currentRecipeImages.get(String(recipe.id))
       if (currentImage?.image && currentImage.imageId === recipe.imageId && currentImage.imageVersion === recipe.imageVersion) recipe.image = currentImage.image
     })
-    const shouldRender = force || recipesChanged(syncedRecipes)
+    const guestMembersChanged = previousGuestMembers !== JSON.stringify(Array.isArray(window.__familyGuestMembers) ? window.__familyGuestMembers : [])
+    const shouldRender = force || recipesChanged(syncedRecipes) || guestMembersChanged
     recipes = syncedRecipes
     const serializable = serializeRecipes()
-    storageSet(userStorageKey(), JSON.stringify(serializable))
-    writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
-    if (!cloudLibraryExists) await saveCloudLibrary(serializable)
+    if (!guestMemberKey) {
+      storageSet(userStorageKey(), JSON.stringify(serializable))
+      writeRecipeCache(serializable).catch(error => console.warn('IndexedDB 菜谱缓存写入失败。', error))
+    }
+    if (!cloudLibraryExists && !guestMemberKey) await saveCloudLibrary(serializable)
     if (shouldRender) render()
     hydrateRecipeImages(getFilteredRecipes().slice(0, HOME_PRELOAD_LIMIT), true).catch(error => console.warn('本地图片缓存读取失败。', error))
     preloadHomeImages().catch(error => console.warn('首页图片预加载失败。', error))
@@ -2314,7 +2338,7 @@ root.addEventListener('error', event => {
 }, true)
 
 root.addEventListener('click', async event => {
-  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
+  const target = event.target instanceof Element ? event.target.closest('[data-action], [data-category], [data-scope], [data-guest-member], [data-guest-nav], [data-ranking-period], [data-stats-period], [data-recipe], [data-recipe-id], [data-draft-category], [data-edit-note], [data-delete-note], [data-edit-cook], [data-delete-cook], [data-member-view], [data-member-toggle], [data-member-pin], [data-member-rename], [data-member-delete]') : null
   if (!target) {
     if (annualTrendPoint) { annualTrendPoint = null; render() }
     return
@@ -2331,6 +2355,12 @@ root.addEventListener('click', async event => {
     initSupabaseSessionBridge().catch(() => null)
   }
   if (target.dataset.category) { activeCategory = target.dataset.category; homeView = 'library'; settingsMenuOpen = false; render(); return }
+  if (target.dataset.guestMember !== undefined) { await selectGuestMember(target.dataset.guestMember); return }
+  if (target.dataset.guestNav) {
+    const targetClass = target.dataset.guestNav === 'trend' ? '.annual-trend-panel' : '.home-leaderboard'
+    document.querySelector(targetClass)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
   if (target.dataset.statsPeriod) { await setFamilyStatsPeriod(target.dataset.statsPeriod); return }
   if (target.dataset.rankingPeriod) { await setRankingPeriod(target.dataset.rankingPeriod); return }
   if (action === 'family-stats-prev') { await stepFamilyStatsPeriod(-1); return }
@@ -2666,6 +2696,13 @@ function statsTemplate() {
     </div>`
 }
 
+function guestQuickNavTemplate() {
+  if (currentUser?.role !== 'guest') return ''
+  const entries = Array.isArray(window.__familyGuestMembers) ? window.__familyGuestMembers.slice(0, 4) : []
+  const memberButtons = entries.map(member => `<button type="button" data-guest-member="${escapeHtml(member.key)}" class="${guestMemberKey === String(member.key) ? 'active' : ''}">${escapeHtml(member.name)}</button>`).join('')
+  return `<nav class="guest-quick-nav" aria-label="家庭快捷导航">${memberButtons}<button type="button" data-guest-nav="trend">做饭趋势</button><button type="button" data-guest-nav="most">最常做</button></nav>`
+}
+
 function authTemplate(message = '') {
   return `<main class="auth-screen"><section class="auth-card"><div class="auth-mark">家</div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p>家庭私房菜谱</p>
     <form id="login-form" class="login-form">
@@ -2767,7 +2804,7 @@ async function quickCookRecipe() {
 }
 
 async function refreshFamilyStatsOnly({ force = false } = {}) {
-  if (!cloudReady || currentUser?.role === 'guest') return
+  if (!cloudReady) return
   const requestGeneration = ++familyStatsRequestGeneration
   const requestedPeriod = familyStatsPeriod
   const requestedYear = familyStatsYear
@@ -2809,7 +2846,7 @@ async function refreshFamilyStatsOnly({ force = false } = {}) {
 }
 
 async function refreshAnnualTrendOnly({ force = false } = {}) {
-  if (!cloudReady || currentUser?.role === 'guest') return
+  if (!cloudReady) return
   const requestGeneration = ++annualTrendRequestGeneration
   const requestedYear = annualTrendYear
   annualTrendPoint = null
@@ -2976,6 +3013,7 @@ async function startApplication() {
     startSessionWatch()
     history.replaceState({ appPage: 'home' }, '')
     activeScope = currentUser?.role === 'guest' ? 'shared' : 'mine'
+    guestMemberKey = ''
     activeCategory = '全部'
     query = ''
     viewingMember = null

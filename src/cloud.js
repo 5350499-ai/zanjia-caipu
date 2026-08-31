@@ -47,11 +47,13 @@ async function withOneSafeRetry(operation) {
   }
 }
 
-export async function loadCloudLibrary() {
-  const response = await fetch('/api/recipes', { cache: 'no-store', credentials: 'same-origin' })
+export async function loadCloudLibrary({ memberKey = '' } = {}) {
+  const suffix = memberKey === '' ? '' : `?member=${encodeURIComponent(memberKey)}`
+  const response = await fetch(`/api/recipes${suffix}`, { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw new Error(`Cloud read failed: ${response.status}`)
   const data = await response.json()
   window.__familyRecipeStats = data.stats || null
+  window.__familyGuestMembers = Array.isArray(data.guestMembers) ? data.guestMembers : []
   return data.recipes || []
 }
 

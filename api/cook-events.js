@@ -45,15 +45,17 @@ module.exports = async function handler(requestMessage, response) {
       return sendJson(response, 200, { rankings: buildRanking(recipes, visibleEvents, { period, year, month }), period, year: period === 'all' ? null : year, month: period === 'month' ? month : null })
     }
     if (action === 'family-trend') {
-      if (user.role === 'guest') return sendJson(response, 200, { visible: false, year, members: [] })
       const members = await request('/rest/v1/family_profiles', { query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc` })
-      const familyRecipes = await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id` })
+      const familyRecipes = user.role === 'guest'
+        ? recipes.map(recipe => ({ id: recipe.id, author_user_id: recipe.author_user_id }))
+        : await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id` })
       return sendJson(response, 200, { visible: true, year, members: buildAnnualCookingTrend(members, familyRecipes, events, { year, currentYear, currentMonth }) })
     }
     if (action === 'family-stats') {
-      if (user.role === 'guest') return sendJson(response, 200, { visible: false, period, year: period === 'all' ? null : year, month: period === 'month' ? month : null, members: [] })
       const members = await request('/rest/v1/family_profiles', { query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc` })
-      const familyRecipes = await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id,created_at` })
+      const familyRecipes = user.role === 'guest'
+        ? recipes.map(recipe => ({ id: recipe.id, author_user_id: recipe.author_user_id, created_at: recipe.created_at }))
+        : await request('/rest/v1/recipes', { query: `?family_id=eq.${encodeFilter(user.familyId)}&select=id,author_user_id,created_at` })
       return sendJson(response, 200, { visible: true, period, year: period === 'all' ? null : year, month: period === 'month' ? month : null, members: buildFamilyStats(members, familyRecipes, events, { period, year, month }) })
     }
     if (recipeId) {
