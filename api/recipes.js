@@ -97,7 +97,7 @@ async function loadVisibleRecipes(user, memberKey = '') {
   const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
   let guestMembers = []
   let selectedProfileId = null
-  if (user.role === 'guest') {
+  {
     const profiles = await request('/rest/v1/family_profiles', {
       query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc`,
     })
@@ -109,9 +109,9 @@ async function loadVisibleRecipes(user, memberKey = '') {
     const selected = Number.isInteger(Number(memberKey)) ? guestProfiles[Number(memberKey)]?.profile : null
     selectedProfileId = selected?.id || null
   }
-  const filteredRows = user.role === 'guest' && memberKey !== '' && selectedProfileId
+  const filteredRows = memberKey !== '' && selectedProfileId
     ? rows.filter(row => String(row.author_user_id) === String(selectedProfileId))
-    : (user.role === 'guest' && memberKey !== '' ? [] : rows)
+    : (memberKey !== '' ? [] : rows)
   const summaries = new Map()
   visibleEvents.forEach(event => {
     const summary = summaries.get(String(event.recipe_id)) || { count: 0, lastCookedAt: null }

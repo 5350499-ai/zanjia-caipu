@@ -1598,6 +1598,12 @@ body,
   gap: 6px;
   margin: 0 0 var(--space-2);
 }
+.home-scope-controls.primary-scope-controls { grid-template-columns: minmax(0, 1fr); }
+.home-primary-nav { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr) minmax(0, 1fr) minmax(52px, .42fr); gap: 4px; width: 100%; }
+.home-primary-nav button { min-width: 0; min-height: 42px; padding: 0 4px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); background: var(--card); font-size: 13px; font-weight: 800; white-space: nowrap; touch-action: manipulation; }
+.home-primary-nav button.active { color: #7c362d; border-color: rgba(156, 73, 59, .42); background: #f2e3dc; }
+.home-primary-nav button:last-child { font-size: 12px; }
+.home-primary-nav button:active { transform: scale(.98); }
 
 .home-scope-controls .home-stats {
   min-width: 0;
@@ -1920,6 +1926,8 @@ body,
 }
 :root[data-theme="dark"] .guest-quick-nav button { color: var(--color-text-muted); background: var(--color-surface); border-color: var(--color-border); }
 :root[data-theme="dark"] .guest-quick-nav button.active { color: var(--primary-text); background: var(--color-brand); border-color: var(--color-brand); }
+:root[data-theme="dark"] .home-primary-nav button { color: var(--color-text-muted); background: var(--color-surface); border-color: var(--color-border); }
+:root[data-theme="dark"] .home-primary-nav button.active { color: var(--primary-text); background: var(--color-brand); border-color: var(--color-brand); }
 
 /* Phase 7.3: compact detail actions and one-tap cooking completion. */
 .share-status-card {

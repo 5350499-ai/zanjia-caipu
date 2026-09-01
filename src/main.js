@@ -532,8 +532,8 @@ function rankingTemplate() {
 }
 
 function recipePanelTemplate() {
-  if (currentUser?.role === 'guest' && homeView === 'trend') return `<div class="recipe-list guest-trend-view">${familyStatsTemplate()}${annualTrendTemplate()}</div>`
-  if (currentUser?.role === 'guest' && homeView === 'most') return `<div class="recipe-list guest-most-view">${rankingTemplate()}</div>`
+  if (homeView === 'trend') return `<div class="recipe-list guest-trend-view">${familyStatsTemplate()}${annualTrendTemplate()}</div>`
+  if (homeView === 'most') return `<div class="recipe-list guest-most-view">${rankingTemplate()}</div>`
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
   const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
@@ -551,7 +551,7 @@ const HOME_SCOPE_ORDER = ['mine', 'shared', 'favorites']
 function setHomeScope(nextScope) {
   if (!HOME_SCOPE_ORDER.includes(nextScope)) return
   activeScope = nextScope
-  if (currentUser?.role === 'guest' && nextScope === 'shared') homeView = 'home'
+  if (nextScope === 'shared') homeView = 'home'
   else if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
   else {
     homeView = 'library'
@@ -563,8 +563,8 @@ function setHomeScope(nextScope) {
   render()
 }
 
-async function selectGuestMember(memberKey) {
-  if (currentUser?.role !== 'guest' || !cloudReady) return
+async function selectFamilyMember(memberKey) {
+  if (!currentUser || !cloudReady) return
   guestMemberKey = String(memberKey)
   activeScope = 'shared'
   activeCategory = '全部'
@@ -582,7 +582,7 @@ async function selectGuestMember(memberKey) {
 }
 
 async function openGuestView(view) {
-  if (currentUser?.role !== 'guest' || !cloudReady) return
+  if (!currentUser || !cloudReady) return
   guestMemberKey = ''
   activeScope = 'shared'
   activeCategory = '全部'
@@ -601,7 +601,7 @@ function homeTemplate() {
         ${viewingMember ? '<button class="secondary-mini-button" data-action="stop-view-member">返回我的首页</button>' : ''}
       </div>
       ${settingsMenuTemplate()}
-      <div class="home-scope-controls">${statsTemplate()}</div>${guestQuickNavTemplate()}
+      <div class="home-scope-controls ${currentUser?.role === 'guest' ? 'guest-scope-controls' : 'primary-scope-controls'}">${statsTemplate()}</div>${guestQuickNavTemplate()}
       ${showRecipeControls ? `<div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
       <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div>` : ''}</header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
@@ -1420,7 +1420,7 @@ async function syncCloudLibrary({ force = false } = {}) {
   if (!cloudReady) return
   try {
     const previousGuestMembers = JSON.stringify(Array.isArray(window.__familyGuestMembers) ? window.__familyGuestMembers : [])
-    const cloudRecipes = await loadCloudLibrary({ memberKey: currentUser?.role === 'guest' ? guestMemberKey : '' })
+    const cloudRecipes = await loadCloudLibrary({ memberKey: currentUser ? guestMemberKey : '' })
     const cloudLibraryExists = Array.isArray(cloudRecipes)
     const syncedRecipes = cloudLibraryExists ? cloudRecipes.map(({ image, ...recipe }) => ({ ...recipe, image: null })) : serializeRecipes(recipes).map(recipe => ({ ...recipe, image: null }))
     const currentRecipeImages = new Map(recipes.map(recipe => [String(recipe.id), { imageId: recipe.imageId, imageVersion: recipe.imageVersion, image: recipe.image }]))
@@ -2370,16 +2370,33 @@ root.addEventListener('click', async event => {
     initSupabaseSessionBridge().catch(() => null)
   }
   if (target.dataset.category) {
-    const isAllCollapse = target.dataset.category === '全部' && currentUser?.role === 'guest' && activeScope === 'shared' && !guestMemberKey && homeView === 'library' && activeCategory === '全部'
     activeCategory = target.dataset.category
-    homeView = isAllCollapse ? 'home' : 'library'
+    homeView = 'library'
     settingsMenuOpen = false
     render()
     return
   }
-  if (target.dataset.guestMember !== undefined) { await selectGuestMember(target.dataset.guestMember); return }
+  if (target.dataset.guestMember !== undefined) { await selectFamilyMember(target.dataset.guestMember); return }
   if (target.dataset.guestNav) {
     await openGuestView(target.dataset.guestNav === 'trend' ? 'trend' : 'most')
+    return
+  }
+  if (action === 'home-my-recipes') {
+    activeScope = 'mine'
+    guestMemberKey = ''
+    activeCategory = '全部'
+    query = ''
+    homeView = 'home'
+    render()
+    return
+  }
+  if (action === 'toggle-all-recipes') {
+    activeScope = 'mine'
+    guestMemberKey = ''
+    activeCategory = '全部'
+    query = ''
+    homeView = homeView === 'library' ? 'home' : 'library'
+    render()
     return
   }
   if (target.dataset.statsPeriod) { await setFamilyStatsPeriod(target.dataset.statsPeriod); return }
@@ -2710,15 +2727,17 @@ function statsTemplate() {
       <span class="stat-card disabled"><strong>游客</strong><span>仅浏览</span></span>
     </div>`
   }
-  return `<div class="home-stats" aria-label="菜谱范围">
-      <button type="button" data-scope="mine" class="${mineActive ? 'active' : ''}"><strong>${stats.mine}</strong><span>我的菜谱</span></button>
-      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><strong>${stats.shared}</strong><span>家庭共享</span></button>
-      <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}"><strong>${stats.favorites}</strong><span>我的收藏</span></button>
-    </div>`
+  const allExpanded = activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部'
+  return `<nav class="home-primary-nav" aria-label="菜谱范围">
+      <button type="button" data-action="home-my-recipes" class="${mineActive && !allExpanded ? 'active' : ''}">我的菜谱</button>
+      <button type="button" data-action="toggle-all-recipes" class="${allExpanded ? 'active' : ''}">${allExpanded ? '收起菜谱' : '全部菜谱'}</button>
+      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}">家庭共享</button>
+      <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}">收藏</button>
+    </nav>`
 }
 
 function guestQuickNavTemplate() {
-  if (currentUser?.role !== 'guest') return ''
+  if (!currentUser) return ''
   const entries = Array.isArray(window.__familyGuestMembers) && window.__familyGuestMembers.length
     ? window.__familyGuestMembers.slice(0, 4)
     : ['爸爸', '妈妈', '晓晰', '晓婉'].map((name, key) => ({ key: String(key), name }))
