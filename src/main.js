@@ -2728,11 +2728,12 @@ function statsTemplate() {
     </div>`
   }
   const allExpanded = activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部'
+  const recipeCount = stats.mine
   return `<nav class="home-primary-nav" aria-label="菜谱范围">
-      <button type="button" data-action="home-my-recipes" class="${mineActive && !allExpanded ? 'active' : ''}">我的菜谱</button>
-      <button type="button" data-action="toggle-all-recipes" class="${allExpanded ? 'active' : ''}">${allExpanded ? '收起菜谱' : '全部菜谱'}</button>
-      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}">家庭共享</button>
-      <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}">收藏</button>
+      <button type="button" data-action="home-my-recipes" class="${mineActive && !allExpanded ? 'active' : ''}"><span>我的菜谱</span><strong>${recipeCount}</strong></button>
+      <button type="button" data-action="toggle-all-recipes" class="${allExpanded ? 'active' : ''}"><span>${allExpanded ? '收起菜谱' : '全部菜谱'}</span><strong>${recipeCount}</strong></button>
+      <button type="button" data-scope="shared" class="${sharedActive ? 'active' : ''}"><span>家庭共享</span><strong>${stats.shared}</strong></button>
+      <button type="button" data-scope="favorites" class="${favoritesActive ? 'active' : ''}"><span>收藏</span>${stats.favorites ? `<strong>${stats.favorites}</strong>` : ''}</button>
     </nav>`
 }
 
@@ -2741,7 +2742,12 @@ function guestQuickNavTemplate() {
   const entries = Array.isArray(window.__familyGuestMembers) && window.__familyGuestMembers.length
     ? window.__familyGuestMembers.slice(0, 4)
     : ['爸爸', '妈妈', '晓晰', '晓婉'].map((name, key) => ({ key: String(key), name }))
-  const memberButtons = entries.map(member => `<button type="button" data-guest-member="${escapeHtml(member.key)}" class="${guestMemberKey === String(member.key) ? 'active' : ''}">${escapeHtml(member.name)}</button>`).join('')
+  const cookCounts = new Map((Array.isArray(familyStats.members) ? familyStats.members : []).map(row => [shortMemberName(row.name), Number(row.cookCount) || 0]))
+  const memberButtons = entries.map(member => {
+    const name = shortMemberName(member.name)
+    const count = cookCounts.get(name)
+    return `<button type="button" data-guest-member="${escapeHtml(member.key)}" class="${guestMemberKey === String(member.key) ? 'active' : ''}"><span>${escapeHtml(name)}</span>${count == null ? '' : ` <small>${count}</small>`}</button>`
+  }).join('')
   return `<nav class="guest-quick-nav" aria-label="家庭快捷导航">${memberButtons}<button type="button" data-guest-nav="trend">做饭趋势</button><button type="button" data-guest-nav="most">最常做</button></nav>`
 }
 

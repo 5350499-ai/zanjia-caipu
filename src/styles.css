@@ -250,6 +250,7 @@ textarea.form-control.tall { min-height: 130px; }
 .home-stats strong { display: block; color: #9c493b; font-family: Georgia, serif; font-size: 18px; line-height: 1; }
 .guest-quick-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0 0 10px; }
 .guest-quick-nav button { min-width: 0; height: 34px; padding: 0 2px; border: 1px solid var(--border); border-radius: 9px; color: var(--text-muted); background: var(--card); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.guest-quick-nav button small { font-size: 10px; font-weight: 800; opacity: .82; }
 .guest-quick-nav button.active { color: #7c362d; border-color: rgba(156, 73, 59, .42); background: #f2e3dc; }
 .guest-quick-nav button:active { transform: scale(.98); }
 .home-stats span span,
@@ -1601,6 +1602,7 @@ body,
 .home-scope-controls.primary-scope-controls { grid-template-columns: minmax(0, 1fr); }
 .home-primary-nav { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr) minmax(0, 1fr) minmax(52px, .42fr); gap: 4px; width: 100%; }
 .home-primary-nav button { min-width: 0; min-height: 42px; padding: 0 4px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); background: var(--card); font-size: 13px; font-weight: 800; white-space: nowrap; touch-action: manipulation; }
+.home-primary-nav button strong { margin-left: 2px; font-size: 11px; font-weight: 700; opacity: .78; }
 .home-primary-nav button.active { color: #7c362d; border-color: rgba(156, 73, 59, .42); background: #f2e3dc; }
 .home-primary-nav button:last-child { font-size: 12px; }
 .home-primary-nav button:active { transform: scale(.98); }
