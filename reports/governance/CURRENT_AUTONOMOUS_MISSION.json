@@ -7,8 +7,8 @@
   "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER": "YES",
   "CURRENT_PRODUCTION_UNCHANGED": "YES",
   "HK_PRODUCTION_ACTIVE": "YES",
-  "CURRENT_PHASE": "POST_FEATURE_RELEASE_ACCEPTANCE",
-  "CURRENT_GATE": "TOP_NAV_PRODUCTION_REGRESSION",
+  "CURRENT_PHASE": "POST_COUNT_LABEL_RELEASE_ACCEPTANCE",
+  "CURRENT_GATE": "COUNT_SEMANTICS_PRODUCTION_REGRESSION",
   "LAST_CONFIRMED_SAFE_POINT": "PRODUCTION_CUTOVER_AND_SYNTHETIC_WRITE_ACCEPTANCE_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
@@ -53,7 +53,8 @@
     "Source image bytes were safely exported through the authenticated Production Guest image API; 76 bound objects were copied and SHA-256 reconciled.",
     "Candidate database, API and project-local Storage are independent and healthy.",
     "Annual trend regression root cause: PostgreSQL DATE values arrived as JavaScript Date objects in the direct runtime; strict string-date parsing discarded every event from the annual series while all-time totals remained correct.",
-    "Logged-in navigation release: primary four-item nav is synchronous, all-recipes toggle is local state, and family member quick navigation reuses recorder-author filtering for every authenticated role."
+    "Logged-in navigation release: primary four-item nav is synchronous, all-recipes toggle is local state, and family member quick navigation reuses recorder-author filtering for every authenticated role.",
+    "Count-label release: first-row recipe counts are derived from recipe collections; second-row member counts are derived from family-stats cook-event totals. Production reconciliation returned 78 shared recipes and cook totals 67/7/5/4."
   ],
   "ATTEMPT_HISTORY": [
     "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
@@ -64,7 +65,8 @@
     "Approved candidate hostname zanjia-candidate.beeboxlab.com mapped via Alibaba DNS; Nginx reverse proxy and Let's Encrypt TLS provisioned.",
     "External HTTPS guest/API/image-read and mobile viewport acceptance passed; synthetic image upload write path returned 200 and fixture was cleaned.",
     "Source/Candidate guest recipe ID delta dry-run detected one new source recipe; copied it with preserved ID and restored its image; final ID-set reconciliation passed 77/77.",
-    "Built and deployed immutable candidate-b5c9dbc, validated member-filter API counts 63/7/4/4 and guest write denial, then promoted prod-nav-b5c9dbc with production resource/API smoke passing."
+    "Built and deployed immutable candidate-b5c9dbc, validated member-filter API counts 63/7/4/4 and guest write denial, then promoted prod-nav-b5c9dbc with production resource/API smoke passing.",
+    "Built candidate-ba5c175 and promoted prod-counts-ba5c175; production asset/API smoke and count reconciliation passed; ephemeral candidate stopped and removed."
   ],
   "FAILED_APPROACHES_DO_NOT_REPEAT": [
     "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
@@ -74,7 +76,7 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Observe Production; logged-in top navigation and family quick-nav release regression completed.",
+  "NEXT_ACTION": "Observe Production; recipe-count and cook-count labels release regression completed.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [],
@@ -106,11 +108,11 @@
   "STORAGE_RECONCILIATION_STATE": "PASS_FINAL_CUTOVER_77_OBJECTS_42755558_BYTES_SHA256_MATCH",
   "CANONICAL_PRODUCTION_HOSTNAME": "cook.beeboxlab.com",
   "CANONICAL_PRODUCTION_URL": "https://cook.beeboxlab.com",
-  "ACTIVE_PRODUCTION_RELEASE": "prod-nav-b5c9dbc",
+  "ACTIVE_PRODUCTION_RELEASE": "prod-counts-ba5c175",
   "PREVIOUS_PRODUCTION_RELEASE": "Vercel Production + original Supabase",
   "CUTOVER_TIMESTAMP": "2026-08-31T08:04:00Z",
   "PRE_CUTOVER_BACKUP": "PASS",
-  "POST_CUTOVER_ACCEPTANCE": "PASS_NAV_MEMBER_FILTER_API_GUEST_PERMISSION_AND_ASSET_SMOKE",
+  "POST_CUTOVER_ACCEPTANCE": "PASS_COUNT_SEMANTICS_RECONCILIATION_AND_ASSET_SMOKE",
   "OLD_PLATFORM_REFERENCE": "Vercel https://zanjia-caipu.vercel.app + original Supabase preserved",
   "OTHER_PROJECT_IMPACT": "NONE; Fenzu SizeOK game-status-radar healthy",
   "HK_SERVER_INVENTORY": {
