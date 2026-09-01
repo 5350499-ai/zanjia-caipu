@@ -526,12 +526,14 @@ function rankingTemplate() {
   const canNext = rankingPeriod === 'month' ? !(rankingYear > now.year || (rankingYear === now.year && rankingMonth >= now.month)) : !(rankingPeriod === 'year' && rankingYear >= now.year)
   const nav = rankingPeriod === 'all' ? '' : `<div class="ranking-period-nav"><button type="button" data-action="ranking-prev" aria-label="上一个">‹</button><strong>${label}</strong><button type="button" data-action="ranking-next" aria-label="下一个" ${canNext ? '' : 'disabled'}>›</button></div>`
   const tabs = [['all', '总计'], ['year', '本年'], ['month', '本月']].map(([value, text]) => `<button type="button" class="ranking-period-tab ${rankingPeriod === value ? 'active' : ''}" data-ranking-period="${value}">${text}</button>`).join('')
-  const rankingRows = monthlyRanking.slice(0, 10).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
+  const rankingRows = monthlyRanking.slice(0, 20).map((item, index) => `<button class="home-ranking-row" type="button" data-action="open-recipe" data-recipe-id="${escapeHtml(item.recipeId)}"><span class="home-ranking-position">${index + 1}</span><span class="home-ranking-name">${escapeHtml(item.name)}</span><span class="home-ranking-count">${Number(item.count) || 0}次</span><span class="home-ranking-bar" aria-hidden="true"><i style="width:${Math.round(((Number(item.count) || 0) / rankingMax) * 100)}%"></i></span></button>`).join('')
   const emptyState = rankingDataState === 'confirmed' || rankingDataState === 'cached' ? '<p class="home-leaderboard-empty">暂无做菜记录</p>' : '<p class="home-leaderboard-loading" aria-live="polite">正在加载统计…</p>'
   return `<section class="home-leaderboard" aria-label="家里最常做"><div class="home-leaderboard-heading"><h2>家里最常做</h2>${nav}</div><div class="ranking-period-tabs">${tabs}</div>${rankingRows || emptyState}</section>`
 }
 
 function recipePanelTemplate() {
+  if (currentUser?.role === 'guest' && homeView === 'trend') return `<div class="recipe-list guest-trend-view">${familyStatsTemplate()}${annualTrendTemplate()}</div>`
+  if (currentUser?.role === 'guest' && homeView === 'most') return `<div class="recipe-list guest-most-view">${rankingTemplate()}</div>`
   const filtered = getFilteredRecipes()
   const emptyTitle = activeScope === 'favorites' ? '还没有收藏菜谱' : '没有找到相关菜谱'
   const emptyHint = activeScope === 'favorites' ? '打开菜谱详情，点击收藏即可加入这里。' : '换个菜名或材料试试'
@@ -548,9 +550,10 @@ const HOME_SCOPE_ORDER = ['mine', 'shared', 'favorites']
 
 function setHomeScope(nextScope) {
   if (!HOME_SCOPE_ORDER.includes(nextScope)) return
-  if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
+  activeScope = nextScope
+  if (currentUser?.role === 'guest' && nextScope === 'shared') homeView = 'home'
+  else if (nextScope === 'mine' && activeScope === 'mine' && homeView === 'library' && !query.trim() && activeCategory === '全部') homeView = 'home'
   else {
-    activeScope = nextScope
     homeView = 'library'
   }
   viewingMember = null
@@ -566,7 +569,7 @@ async function selectGuestMember(memberKey) {
   activeScope = 'shared'
   activeCategory = '全部'
   query = ''
-  homeView = 'home'
+  homeView = 'member'
   render()
   try {
     const next = await loadCloudLibrary({ memberKey: guestMemberKey })
@@ -578,8 +581,20 @@ async function selectGuestMember(memberKey) {
   }
 }
 
+async function openGuestView(view) {
+  if (currentUser?.role !== 'guest' || !cloudReady) return
+  guestMemberKey = ''
+  activeScope = 'shared'
+  activeCategory = '全部'
+  query = ''
+  homeView = view
+  render()
+  await syncCloudLibrary({ force: true })
+}
+
 function homeTemplate() {
   if (!homeCategories.includes(activeCategory)) activeCategory = '全部'
+  const showRecipeControls = !['trend', 'most'].includes(homeView)
   return `<div class="app-shell home-shell">
     <header class="home-header"><div class="brand-row"><div><div class="eyebrow">OUR FAMILY TABLE</div><h1>咱家菜谱</h1><p class="account-subtitle">${escapeHtml(homeSubtitle())}</p></div><div class="header-actions">${globalActionsTemplate()}</div></div>
       <div class="home-action-row">
@@ -587,8 +602,8 @@ function homeTemplate() {
       </div>
       ${settingsMenuTemplate()}
       <div class="home-scope-controls">${statsTemplate()}</div>${guestQuickNavTemplate()}
-      <div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
-      <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div></header>
+      ${showRecipeControls ? `<div class="home-search-row"><label class="search-box">${icons.search}<input id="search" value="${escapeHtml(query)}" placeholder="搜索" autocomplete="off" enterkeyhint="search"><button class="clear-search ${query ? '' : 'hidden'}" data-action="clear" aria-label="清空搜索">${icons.close}</button></label>
+      <nav class="category-nav" aria-label="菜谱分类">${homeCategories.map(category => `<button data-category="${category}" class="${category === activeCategory ? 'active' : ''}"><span>${category}</span></button>`).join('')}</nav></div>` : ''}</header>
     <div class="home-body"><main class="recipe-panel"><div class="pull-refresh-indicator ${refreshing ? 'visible' : ''}">${refreshing ? '正在同步最新菜谱…' : '下拉刷新'}</div>${recipePanelTemplate()}</main></div>
     </div>`
 }
@@ -2354,11 +2369,17 @@ root.addEventListener('click', async event => {
     render()
     initSupabaseSessionBridge().catch(() => null)
   }
-  if (target.dataset.category) { activeCategory = target.dataset.category; homeView = 'library'; settingsMenuOpen = false; render(); return }
+  if (target.dataset.category) {
+    const isAllCollapse = target.dataset.category === '全部' && currentUser?.role === 'guest' && activeScope === 'shared' && !guestMemberKey && homeView === 'library' && activeCategory === '全部'
+    activeCategory = target.dataset.category
+    homeView = isAllCollapse ? 'home' : 'library'
+    settingsMenuOpen = false
+    render()
+    return
+  }
   if (target.dataset.guestMember !== undefined) { await selectGuestMember(target.dataset.guestMember); return }
   if (target.dataset.guestNav) {
-    const targetClass = target.dataset.guestNav === 'trend' ? '.annual-trend-panel' : '.home-leaderboard'
-    document.querySelector(targetClass)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    await openGuestView(target.dataset.guestNav === 'trend' ? 'trend' : 'most')
     return
   }
   if (target.dataset.statsPeriod) { await setFamilyStatsPeriod(target.dataset.statsPeriod); return }

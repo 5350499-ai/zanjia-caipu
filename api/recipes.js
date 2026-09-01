@@ -96,7 +96,7 @@ async function loadVisibleRecipes(user, memberKey = '') {
   const visibleIds = new Set(rows.map(row => String(row.id)))
   const visibleEvents = events.filter(event => visibleIds.has(String(event.recipe_id)))
   let guestMembers = []
-  let memberEvents = visibleEvents
+  let selectedProfileId = null
   if (user.role === 'guest') {
     const profiles = await request('/rest/v1/family_profiles', {
       query: `?family_id=eq.${encodeFilter(user.familyId)}&is_active=eq.true&select=id,display_name&order=created_at.asc`,
@@ -107,19 +107,13 @@ async function loadVisibleRecipes(user, memberKey = '') {
       .sort((a, b) => (preferredOrder.indexOf(a.name) < 0 ? 99 : preferredOrder.indexOf(a.name)) - (preferredOrder.indexOf(b.name) < 0 ? 99 : preferredOrder.indexOf(b.name)))
     guestMembers = guestProfiles.map((entry, index) => ({ key: String(index), name: entry.name || `成员${index + 1}` }))
     const selected = Number.isInteger(Number(memberKey)) ? guestProfiles[Number(memberKey)]?.profile : null
-    if (selected) memberEvents = visibleEvents.filter(event => String(event.user_id) === String(selected.id))
+    selectedProfileId = selected?.id || null
   }
-  const memberRecipeIds = new Set(memberEvents.map(event => String(event.recipe_id)))
-  const latestByRecipe = new Map()
-  memberEvents.forEach(event => {
-    const key = String(event.recipe_id)
-    const cookedOn = String(event.cooked_on || '')
-    if (!latestByRecipe.has(key) || cookedOn > latestByRecipe.get(key)) latestByRecipe.set(key, cookedOn)
-  })
-  const filteredRows = user.role === 'guest' && memberKey !== '' ? rows.filter(row => memberRecipeIds.has(String(row.id))) : rows
-  if (user.role === 'guest' && memberKey !== '') filteredRows.sort((a, b) => String(latestByRecipe.get(String(b.id)) || '').localeCompare(String(latestByRecipe.get(String(a.id)) || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  const filteredRows = user.role === 'guest' && memberKey !== '' && selectedProfileId
+    ? rows.filter(row => String(row.author_user_id) === String(selectedProfileId))
+    : (user.role === 'guest' && memberKey !== '' ? [] : rows)
   const summaries = new Map()
-  memberEvents.forEach(event => {
+  visibleEvents.forEach(event => {
     const summary = summaries.get(String(event.recipe_id)) || { count: 0, lastCookedAt: null }
     summary.count += 1
     if (!summary.lastCookedAt || String(event.cooked_on) > String(summary.lastCookedAt)) summary.lastCookedAt = event.cooked_on
@@ -128,7 +122,7 @@ async function loadVisibleRecipes(user, memberKey = '') {
   const month = madridDate().slice(0, 7)
   return {
     recipes: filteredRows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, lastCookedAt: null })),
-    monthlyRanking: buildMonthlyRanking(filteredRows, memberEvents, month),
+    monthlyRanking: buildMonthlyRanking(filteredRows, visibleEvents, month),
     guestMembers,
   }
 }
