@@ -7,8 +7,8 @@
   "HK_FULL_STACK_CANDIDATE_READY_FOR_CUTOVER": "YES",
   "CURRENT_PRODUCTION_UNCHANGED": "YES",
   "HK_PRODUCTION_ACTIVE": "YES",
-  "CURRENT_PHASE": "POST_COUNT_LABEL_RELEASE_ACCEPTANCE",
-  "CURRENT_GATE": "COUNT_SEMANTICS_PRODUCTION_REGRESSION",
+  "CURRENT_PHASE": "POST_STATS_CONSISTENCY_RELEASE_ACCEPTANCE",
+  "CURRENT_GATE": "MONTH_BOUNDARY_PRODUCTION_REGRESSION",
   "LAST_CONFIRMED_SAFE_POINT": "PRODUCTION_CUTOVER_AND_SYNTHETIC_WRITE_ACCEPTANCE_PASS",
   "COMPLETED_GATES": [
     "GLOBAL_ENGINEERING_READ",
@@ -54,7 +54,8 @@
     "Candidate database, API and project-local Storage are independent and healthy.",
     "Annual trend regression root cause: PostgreSQL DATE values arrived as JavaScript Date objects in the direct runtime; strict string-date parsing discarded every event from the annual series while all-time totals remained correct.",
     "Logged-in navigation release: primary four-item nav is synchronous, all-recipes toggle is local state, and family member quick navigation reuses recorder-author filtering for every authenticated role.",
-    "Count-label release: first-row recipe counts are derived from recipe collections; second-row member counts are derived from family-stats cook-event totals. Production reconciliation returned 78 shared recipes and cook totals 67/7/5/4."
+    "Count-label release: first-row recipe counts are derived from recipe collections; second-row member counts are derived from family-stats cook-event totals. Production reconciliation returned 78 shared recipes and cook totals 67/7/5/4.",
+    "Monthly stats root cause: direct PostgreSQL DATE values were materialized as JavaScript Date objects at the HK database timezone boundary; calendarDate used Europe/Madrid conversion and shifted Sep 1 dates to Aug 31. Normalization now reconstructs the stored Asia/Shanghai database calendar date before aggregation."
   ],
   "ATTEMPT_HISTORY": [
     "Validated project immutable-release contract with distinct BLUE/GREEN slots and ports 18140/18141.",
@@ -66,7 +67,8 @@
     "External HTTPS guest/API/image-read and mobile viewport acceptance passed; synthetic image upload write path returned 200 and fixture was cleaned.",
     "Source/Candidate guest recipe ID delta dry-run detected one new source recipe; copied it with preserved ID and restored its image; final ID-set reconciliation passed 77/77.",
     "Built and deployed immutable candidate-b5c9dbc, validated member-filter API counts 63/7/4/4 and guest write denial, then promoted prod-nav-b5c9dbc with production resource/API smoke passing.",
-    "Built candidate-ba5c175 and promoted prod-counts-ba5c175; production asset/API smoke and count reconciliation passed; ephemeral candidate stopped and removed."
+    "Built candidate-ba5c175 and promoted prod-counts-ba5c175; production asset/API smoke and count reconciliation passed; ephemeral candidate stopped and removed.",
+    "Built candidate-4ef881c and promoted prod-stats-4ef881c; Sep 2026 monthly stats reconciled to Dad 3 cook events, annual trend Sep point 3, and candidate was cleaned up."
   ],
   "FAILED_APPROACHES_DO_NOT_REPEAT": [
     "Do not use deprecated 45.77.123.89, Vultr or Ubuntu 22.04 records.",
@@ -76,7 +78,7 @@
     "Do not use desktop Chrome as the default Alibaba Cloud management channel.",
     "Do not treat missing desktop-browser access as HK infrastructure failure."
   ],
-  "NEXT_ACTION": "Observe Production; recipe-count and cook-count labels release regression completed.",
+  "NEXT_ACTION": "Observe Production; September month-boundary cook-event reconciliation release completed.",
   "ROLLBACK_POINT": "Vercel Production plus original Supabase remain online and unchanged.",
   "P0_BLOCKERS": [],
   "P1_BLOCKERS": [],
@@ -108,11 +110,11 @@
   "STORAGE_RECONCILIATION_STATE": "PASS_FINAL_CUTOVER_77_OBJECTS_42755558_BYTES_SHA256_MATCH",
   "CANONICAL_PRODUCTION_HOSTNAME": "cook.beeboxlab.com",
   "CANONICAL_PRODUCTION_URL": "https://cook.beeboxlab.com",
-  "ACTIVE_PRODUCTION_RELEASE": "prod-counts-ba5c175",
+  "ACTIVE_PRODUCTION_RELEASE": "prod-stats-4ef881c",
   "PREVIOUS_PRODUCTION_RELEASE": "Vercel Production + original Supabase",
   "CUTOVER_TIMESTAMP": "2026-08-31T08:04:00Z",
   "PRE_CUTOVER_BACKUP": "PASS",
-  "POST_CUTOVER_ACCEPTANCE": "PASS_COUNT_SEMANTICS_RECONCILIATION_AND_ASSET_SMOKE",
+  "POST_CUTOVER_ACCEPTANCE": "PASS_SEPTEMBER_MONTH_BOUNDARY_STATS_AND_ASSET_SMOKE",
   "OLD_PLATFORM_REFERENCE": "Vercel https://zanjia-caipu.vercel.app + original Supabase preserved",
   "OTHER_PROJECT_IMPACT": "NONE; Fenzu SizeOK game-status-radar healthy",
   "HK_SERVER_INVENTORY": {
