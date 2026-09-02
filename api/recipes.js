@@ -1,6 +1,6 @@
 const { encodeFilter, request } = require('../lib/supabase-server')
 const { getSessionUser, readJson, sendJson } = require('../lib/server-auth')
-const { buildMonthlyRanking, countRecipeEvents, ensureImageBaseline, listFamilyEvents, madridDate } = require('../lib/cook-events')
+const { buildMonthlyRanking, calendarDate, countRecipeEvents, ensureImageBaseline, listFamilyEvents, madridDate } = require('../lib/cook-events')
 const { deleteImageIfUnreferenced } = require('../lib/storage-images')
 
 function mergeMaterialLines(...values) {
@@ -36,6 +36,7 @@ function toClient(row, summary = null) {
     cookRecords: row.cook_records || [],
     cookCount: summary ? summary.count : (row.cook_count || 0),
     lastCookedAt: summary ? summary.lastCookedAt : (row.last_cooked_at || null),
+    firstCookedOn: summary?.firstCookedOn || null,
     image: null,
     imageId: row.image_id || null,
     imageVersion: row.image_version || null,
@@ -114,14 +115,16 @@ async function loadVisibleRecipes(user, memberKey = '') {
     : (memberKey !== '' ? [] : rows)
   const summaries = new Map()
   visibleEvents.forEach(event => {
-    const summary = summaries.get(String(event.recipe_id)) || { count: 0, lastCookedAt: null }
+    const summary = summaries.get(String(event.recipe_id)) || { count: 0, firstCookedOn: null, lastCookedAt: null }
     summary.count += 1
-    if (!summary.lastCookedAt || String(event.cooked_on) > String(summary.lastCookedAt)) summary.lastCookedAt = event.cooked_on
+    const cookedOn = calendarDate(event.cooked_on)
+    if (!summary.lastCookedAt || cookedOn > summary.lastCookedAt) summary.lastCookedAt = cookedOn
+    if (!summary.firstCookedOn || cookedOn < summary.firstCookedOn) summary.firstCookedOn = cookedOn
     summaries.set(String(event.recipe_id), summary)
   })
   const month = madridDate().slice(0, 7)
   return {
-    recipes: filteredRows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, lastCookedAt: null })),
+    recipes: filteredRows.map(row => toClient(row, summaries.get(String(row.id)) || { count: 0, firstCookedOn: null, lastCookedAt: null })),
     monthlyRanking: buildMonthlyRanking(filteredRows, visibleEvents, month),
     guestMembers,
   }

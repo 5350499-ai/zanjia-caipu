@@ -157,6 +157,7 @@ function normalizeRecipe(recipe) {
     cookRecords: (rest.cookRecords || []).map(record => ({ ...record, id: record.id || uniqueId('cook') })),
     cookCount: Number(rest.cookCount || (rest.cookRecords || []).length || 0),
     lastCookedAt: rest.lastCookedAt || null,
+    firstCookedOn: rest.firstCookedOn || null,
   }
 }
 
@@ -432,6 +433,11 @@ function periodLabel(period, year, month) {
 
 function shortMemberName(name) {
   return String(name || '').replace(/菜谱$/, '')
+}
+
+function formatCookDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return match ? `${Number(match[1])}年${Number(match[2])}月${Number(match[3])}日` : String(value || '')
 }
 
 function sortFamilyMembers(rows) {
@@ -2806,7 +2812,7 @@ function detailTemplate(recipe) {
   return `<div class="app-shell detail-shell"><header class="detail-header"><button class="icon-button" data-action="back-home" aria-label="返回">${icons.back}</button><div class="detail-header-title">菜谱详情</div>${globalActionsTemplate()}</header>
     ${settingsMenuTemplate()}
     <main class="detail-content"><div class="detail-title-row"><div><div class="eyebrow">咱家的拿手菜</div><h1>${escapeHtml(recipe.name)}</h1></div><div class="title-mark">◌</div></div>
-      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次</div>
+      <div class="recipe-author-line">记录人：${escapeHtml(recipe.authorName || '家人')}${recipe.isFamilyShared ? ` · 共享人：${escapeHtml(recipe.authorName || '家人')}` : ''} · 已做 ${recipe.cookCount || 0} 次${recipe.firstCookedOn ? ` · 首次：${formatCookDate(recipe.firstCookedOn)}` : ''}</div>
       <div class="share-status-card ${recipe.isFamilyShared ? 'shared' : 'private'}">
         <div><strong>当前状态：${recipe.isFamilyShared ? '👨‍👩‍👧 家庭共享' : '🔒 私人菜谱'}</strong><small>${recipe.isFamilyShared ? '所有家庭成员都能看到这道菜。' : '只有创建者和管理员可以看到。'}</small></div>
         <div class="share-card-actions"><label class="share-switch ${editable ? '' : 'disabled'}"><span>共享到家庭</span><input type="checkbox" data-action="toggle-family-share" ${recipe.isFamilyShared ? 'checked' : ''} ${editable ? '' : 'disabled'}><i></i></label>${showWritingActions ? `<button class="detail-favorite-button" data-action="toggle-favorite">${isFavorite(recipe) ? '★ 已收藏' : '☆ 收藏'}</button>` : ''}</div>
@@ -2821,12 +2827,13 @@ function detailTemplate(recipe) {
 }
 
 async function loadCookStatus(recipeId) {
-  cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), todayRecorded: false, loading: true, busy: false }
+  cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), firstCookedOn: findRecipeById(recipeId)?.firstCookedOn || null, todayRecorded: false, loading: true, busy: false }
   try {
     const status = await loadCloudCookStatus(recipeId)
-    cookStatus = { recipeId, count: Number(status.count || 0), todayRecorded: Boolean(status.todayRecorded), loading: false, busy: false }
+    cookStatus = { recipeId, count: Number(status.count || 0), firstCookedOn: status.firstCookedOn || null, todayRecorded: Boolean(status.todayRecorded), loading: false, busy: false }
+    recipes = recipes.map(item => sameId(item.id, recipeId) ? { ...item, cookCount: cookStatus.count, firstCookedOn: cookStatus.firstCookedOn } : item)
   } catch (error) {
-    cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), todayRecorded: false, loading: false, busy: false }
+    cookStatus = { recipeId, count: Number(findRecipeById(recipeId)?.cookCount || 0), firstCookedOn: findRecipeById(recipeId)?.firstCookedOn || null, todayRecorded: false, loading: false, busy: false }
   }
   if (page === 'detail' && sameId(selectedId, recipeId)) render()
 }
@@ -2840,7 +2847,7 @@ async function quickCookRecipe() {
     const result = await createCloudCookEvent(recipe.id)
     const count = Number(result.count || cookStatus.count || recipe.cookCount || 0)
     cookStatus = { recipeId: recipe.id, count, todayRecorded: true, loading: false, busy: false }
-    recipes = recipes.map(item => sameId(item.id, recipe.id) ? { ...item, cookCount: count, lastCookedAt: new Date().toLocaleDateString('sv-SE') } : item)
+    recipes = recipes.map(item => sameId(item.id, recipe.id) ? { ...item, cookCount: count, firstCookedOn: item.firstCookedOn || new Date().toLocaleDateString('sv-SE'), lastCookedAt: new Date().toLocaleDateString('sv-SE') } : item)
     await invalidateStatsCacheForMutation({ familyStats: true, ranking: true, annualTrend: true })
     await syncCloudLibrary({ force: true })
     render()

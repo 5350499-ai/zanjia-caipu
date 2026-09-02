@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict')
-const { buildAnnualCookingTrend, buildFamilyStats } = require('../lib/cook-events')
+const { buildAnnualCookingTrend, buildFamilyStats, calendarDate } = require('../lib/cook-events')
 
 const members = [
   { id: 'dad', display_name: '爸爸' },
@@ -29,4 +29,5 @@ const septemberBoundary = [{ recipe_id: 'r1', user_id: 'dad', cooked_on: '2026-0
 const september = buildFamilyStats(members, [{ id: 'r1', author_user_id: 'dad', created_at: '2026-09-01T10:00:00.000Z' }], septemberBoundary, { period: 'month', year: 2026, month: 9 })
 assert.equal(september[0].cookCount, 1)
 assert.equal(september[1].cookCount, 0)
+assert.equal(calendarDate(new Date('2026-08-31T16:00:00.000Z')), '2026-09-01')
 console.log('cook-events trend tests: PASS')
